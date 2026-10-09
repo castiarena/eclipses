@@ -1,0 +1,34 @@
+name: CI
+
+# Checks every pull request before merge. Pushes to main are covered by the
+# deploy workflow, which runs the same tests before publishing.
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A new push to the same PR cancels the run still in progress.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.4.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      # Runs tsc first, so type errors fail here too.
+      - run: pnpm build
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}/
