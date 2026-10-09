@@ -89,7 +89,7 @@ export default function EclipseGlobe({ type, geometry, altitude, you = null }: E
           width={size.width}
           height={size.height}
           backgroundColor="rgba(0,0,0,0)"
-          globeImageUrl="/textures/earth-blue-marble.jpg"
+          globeImageUrl={`${import.meta.env.BASE_URL}textures/earth-blue-marble.jpg`}
           showAtmosphere
           atmosphereColor={GLOBE_COLORS.atmosphere}
           atmosphereAltitude={0.12}
