@@ -3,16 +3,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Globe, { type GlobeMethods } from 'react-globe.gl'
 import type { EclipseGeometry, EclipseType } from '../data/types'
 import { buildLayers, centerOf } from '../globe/layers'
-
-const MAX_HEIGHT = 560
-
-const COLORS = {
-  full: 'rgba(124, 58, 237, 0.85)',
-  partial: 'rgba(192, 132, 252, 0.45)',
-  central: 'rgba(250, 204, 21, 0.35)',
-  limits: 'rgba(250, 204, 21, 0.9)',
-  centerline: '#fde047',
-}
+import { GLOBE_COLORS } from '../globe/palette'
+import type { Point } from '../globe/visibility'
 
 const hasWebGL = (): boolean => {
   try {
@@ -23,40 +15,36 @@ const hasWebGL = (): boolean => {
   }
 }
 
-const LEGEND: Record<EclipseType, { label: string; color: string }[]> = {
-  solar: [
-    { label: 'Path of totality / annularity', color: COLORS.central },
-    { label: 'Centre line', color: COLORS.centerline },
-  ],
-  lunar: [
-    { label: 'Moon up for the whole eclipse', color: COLORS.full },
-    { label: 'Moon up for part of it', color: COLORS.partial },
-  ],
-}
-
 interface EclipseGlobeProps {
   type: EclipseType
   geometry: EclipseGeometry | null
+  /** Camera distance in globe radii; smaller is closer. */
+  altitude: number
+  /** Viewer's position, marked with a pulsing ring. */
+  you?: Point | null
 }
 
-export default function EclipseGlobe({ type, geometry }: EclipseGlobeProps) {
+/** Fills its parent. The parent decides where the globe sits and how much of it shows. */
+export default function EclipseGlobe({ type, geometry, altitude, you = null }: EclipseGlobeProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const globeRef = useRef<GlobeMethods>()
-  const [width, setWidth] = useState(0)
+  const [size, setSize] = useState({ width: 0, height: 0 })
   const [ready, setReady] = useState(false)
   const webgl = useMemo(hasWebGL, [])
 
-  // Track the container width so the globe fills the column on phones.
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
-    const observer = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width))
+    const observer = new ResizeObserver(([entry]) =>
+      setSize({ width: entry.contentRect.width, height: entry.contentRect.height }),
+    )
     observer.observe(el)
     return () => observer.disconnect()
   }, [])
 
   const layers = useMemo(() => (geometry ? buildLayers(geometry) : null), [geometry])
   const center = useMemo(() => (geometry ? centerOf(geometry) : null), [geometry])
+  const rings = useMemo(() => (you ? [you] : []), [you])
 
   // Slow spin while idle; turn off once an eclipse is shown and the camera is aimed at it.
   useEffect(() => {
@@ -68,66 +56,78 @@ export default function EclipseGlobe({ type, geometry }: EclipseGlobeProps) {
 
   useEffect(() => {
     if (!ready || !globeRef.current || !center) return
-    globeRef.current.pointOfView({ lat: center.lat, lng: center.lng, altitude: 2 }, 1200)
-  }, [ready, center])
+    globeRef.current.pointOfView({ lat: center.lat, lng: center.lng, altitude }, 1200)
+  }, [ready, center, altitude])
+
+  useEffect(() => {
+    if (!ready || !globeRef.current || !you) return
+    globeRef.current.pointOfView({ lat: you.lat, lng: you.lng, altitude }, 1200)
+  }, [ready, you, altitude])
 
   if (!webgl) {
-    return <Text>This view needs WebGL, which this browser does not provide.</Text>
+    return (
+      <Box h="full" display="flex" alignItems="center" justifyContent="center" p={8}>
+        <Text opacity={0.7}>This view needs WebGL, which this browser does not provide.</Text>
+      </Box>
+    )
   }
 
-  const height = Math.min(Math.max(width, 0), MAX_HEIGHT)
-
   return (
-    // minW=0 and overflow hidden stop the canvas from widening its own container.
     <Box
       ref={containerRef}
       w="full"
-      minW={0}
+      h="full"
       overflow="hidden"
+      opacity={ready ? 1 : 0}
+      transition="opacity 0.8s ease"
       aria-label={`Globe showing ${type} eclipse visibility`}
       role="img"
     >
-      {width > 0 && (
+      {size.width > 0 && size.height > 0 && (
         <Globe
           ref={globeRef}
-          width={width}
-          height={height}
+          width={size.width}
+          height={size.height}
           backgroundColor="rgba(0,0,0,0)"
           globeImageUrl="/textures/earth-blue-marble.jpg"
           showAtmosphere
-          atmosphereColor="#a78bfa"
-          atmosphereAltitude={0.15}
+          atmosphereColor={GLOBE_COLORS.atmosphere}
+          atmosphereAltitude={0.12}
           onGlobeReady={() => setReady(true)}
           // Lunar: grid points colored by zone.
           pointsData={layers?.points ?? []}
           pointLat="lat"
           pointLng="lng"
-          pointAltitude={0.01}
-          pointRadius={0.35}
-          pointColor={(p: object) => (p as { zone: string }).zone === 'full' ? COLORS.full : COLORS.partial}
+          pointAltitude={0.003}
+          pointRadius={0.62}
+          pointResolution={8}
+          pointColor={(p: object) =>
+            (p as { zone: string }).zone === 'full' ? GLOBE_COLORS.lunarWhole : GLOBE_COLORS.lunarPart
+          }
           // Solar: central path fill, outline and centre line.
           polygonsData={layers?.polygons ?? []}
           polygonGeoJsonGeometry={(d: object) => (d as { geometry: { type: string; coordinates: number[] } }).geometry}
-          polygonCapColor={() => COLORS.central}
+          polygonCapColor={() => GLOBE_COLORS.solarFill}
           polygonSideColor={() => 'rgba(0,0,0,0)'}
           polygonAltitude={0.005}
-          pathsData={layers?.paths.map((p) => p.points) ?? []}
+          pathsData={layers?.paths ?? []}
+          pathPoints="points"
           pathPointLat={(p: object) => (p as { lat: number }).lat}
           pathPointLng={(p: object) => (p as { lng: number }).lng}
-          pathColor={() => COLORS.limits}
-          pathStroke={1.2}
+          pathColor={(p: object) =>
+            (p as { zone: string }).zone === 'centerline' ? GLOBE_COLORS.solarCentre : GLOBE_COLORS.solarLimits
+          }
+          pathStroke={(p: object) => ((p as { zone: string }).zone === 'centerline' ? 0.6 : 1.6)}
           pathPointAlt={0.006}
+          // The viewer's position after "Check my location".
+          ringsData={rings}
+          ringLat="lat"
+          ringLng="lng"
+          ringColor={() => (t: number) => `rgba(255, 255, 255, ${1 - t})`}
+          ringMaxRadius={4}
+          ringPropagationSpeed={2}
+          ringRepeatPeriod={1200}
         />
-      )}
-      {geometry && (
-        <Box mt={3} display="flex" gap={4} flexWrap="wrap" fontSize="sm">
-          {LEGEND[type].map((item) => (
-            <Box key={item.label} display="flex" alignItems="center" gap={2}>
-              <Box w={3} h={3} borderRadius="sm" bg={item.color} />
-              <Text>{item.label}</Text>
-            </Box>
-          ))}
-        </Box>
       )}
     </Box>
   )
