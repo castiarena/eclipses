@@ -58,7 +58,10 @@ export function formatLocalShort(iso: string, { withYear = true } = {}, timeZone
 /** The viewer's offset at that moment, e.g. "UTC−3", "UTC+5:30" or "UTC". */
 export function utcOffsetLabel(iso: string, timeZone?: string): string {
   const name = dateParts(iso, { timeZoneName: 'shortOffset' }, timeZone).timeZoneName ?? 'GMT'
-  return name.replace('GMT', 'UTC').replace('-', '−')
+  const offset = name.replace(/^(GMT|UTC)/, '')
+  // Some ICU builds write a zero offset as "GMT+0" instead of "GMT".
+  if (/^([+-]0(:00)?)?$/.test(offset)) return 'UTC'
+  return `UTC${offset.replace('-', '−')}`
 }
 
 /** 383 -> "6m 23s". Returns null when there is no duration. */
