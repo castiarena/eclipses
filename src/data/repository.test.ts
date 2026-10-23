@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import eclipsesJson from './eclipses.json'
+import { encodeGrid } from './grid'
 import { JsonEclipseRepository, selectUpcoming } from './repository'
-import type { EclipseIndex, EclipseSummary } from './types'
+import type { EclipseGeometryFile, EclipseIndex, EclipseSummary } from './types'
+
+const HOUR = 3_600_000
+const shift = (iso: string, ms: number) => new Date(Date.parse(iso) + ms).toISOString()
 
 const eclipse = (
   id: string,
@@ -13,6 +17,8 @@ const eclipse = (
   type,
   kind: 'total',
   peakUtc,
+  startUtc: shift(peakUtc, -HOUR),
+  endUtc: shift(peakUtc, HOUR),
   magnitude: 1,
   gamma: 0,
   saros: 1,
@@ -21,7 +27,7 @@ const eclipse = (
 })
 
 const fixture: EclipseIndex = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   generatedAt: '2026-01-01T00:00:00Z',
   window: { from: '2026-01-01T00:00:00Z', to: '2036-01-01T00:00:00Z' },
   source: { catalog: 'test', solar: '', lunar: '' },
@@ -41,8 +47,30 @@ describe('selectUpcoming', () => {
   })
 })
 
+const lunarFile: EclipseGeometryFile = {
+  id: 'l-1',
+  schemaVersion: 2,
+  grid: encodeGrid([[0, 0, 2], [3, 6, 1]], 3, { 1: 'partial', 2: 'full' }),
+}
+
 describe('JsonEclipseRepository', () => {
-  const repo = new JsonEclipseRepository(fixture)
+  let loads = 0
+  const loaders = {
+    './geo/l-1.json': async () => {
+      loads++
+      return lunarFile
+    },
+    './geo/s-late.json': async () => ({ ...lunarFile, id: 's-late', schemaVersion: 1 }),
+  }
+  const repo = new JsonEclipseRepository(fixture, loaders)
+
+  it('rejects an index with an unknown schema version', () => {
+    expect(() => new JsonEclipseRepository({ ...fixture, schemaVersion: 1 })).toThrow(/schema version 1/)
+  })
+
+  it('getAll returns every eclipse, earliest first', async () => {
+    expect((await repo.getAll()).map((e) => e.id)).toEqual(['s-past', 's-1', 'l-1', 's-late'])
+  })
 
   it('getUpcoming respects the supplied clock', async () => {
     const list = await repo.getUpcoming('solar', Date.parse('2028-01-01T00:00:00Z'))
@@ -54,6 +82,30 @@ describe('JsonEclipseRepository', () => {
     expect(await repo.getById('missing')).toBeUndefined()
   })
 
+  it('getGeometry decodes a packed lunar grid into points', async () => {
+    const geo = await repo.getGeometry('l-1')
+    expect(geo?.grid?.points).toEqual([
+      [0, 0, 2],
+      [3, 6, 1],
+    ])
+  })
+
+  it('getGeometry loads each file once and shares the promise', async () => {
+    const fresh = new JsonEclipseRepository(fixture, loaders)
+    const before = loads
+    const a = fresh.getGeometry('l-1')
+    const b = fresh.getGeometry('l-1')
+    expect(a).toBe(b)
+    await a
+    await fresh.getGeometry('l-1')
+    expect(loads - before).toBe(1)
+  })
+
+  it('getGeometry rejects a file with an unknown schema version, then retries', async () => {
+    await expect(repo.getGeometry('s-late')).rejects.toThrow(/schema version 1/)
+    await expect(repo.getGeometry('s-late')).rejects.toThrow(/schema version 1/)
+  })
+
   it('getGeometry returns null when the eclipse has no geometry', async () => {
     expect(await repo.getGeometry('s-1')).toBeNull()
     expect(await repo.getGeometry('missing')).toBeNull()
@@ -63,6 +115,30 @@ describe('JsonEclipseRepository', () => {
 describe('generated dataset (src/data/eclipses.json)', () => {
   const index = eclipsesJson as unknown as EclipseIndex
   const repo = new JsonEclipseRepository(index)
+
+  it('covers 2001-2100 for both types', () => {
+    const years = index.eclipses.map((e) => Number(e.peakUtc.slice(0, 4)))
+    expect(Math.min(...years)).toBe(2001)
+    expect(Math.max(...years)).toBe(2100)
+    expect(index.eclipses.filter((e) => e.type === 'solar').length).toBe(224)
+    expect(index.eclipses.filter((e) => e.type === 'lunar').length).toBe(228)
+  })
+
+  it('has an event window around every peak', () => {
+    for (const e of index.eclipses) {
+      const [start, peak, end] = [e.startUtc, e.peakUtc, e.endUtc].map(Date.parse)
+      expect(start, e.id).toBeLessThan(peak)
+      expect(peak, e.id).toBeLessThan(end)
+      expect(end - start, e.id).toBeLessThan(8 * HOUR)
+    }
+  })
+
+  it('maps every central solar eclipse except the three non-central ones', () => {
+    const unmapped = index.eclipses
+      .filter((e) => e.type === 'solar' && e.kind !== 'partial' && !e.hasGeometry)
+      .map((e) => e.id)
+    expect(unmapped).toEqual(['2014-04-29-solar', '2043-04-09-solar', '2043-10-03-solar'])
+  })
 
   it('has ascending peak times and unique ids', () => {
     const times = index.eclipses.map((e) => Date.parse(e.peakUtc))

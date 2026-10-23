@@ -2,8 +2,9 @@
 // Run with: pnpm data:build
 //
 // Output:
-//   src/data/eclipses.json      index of upcoming eclipses (no geometry)
+//   src/data/eclipses.json      index of every eclipse 2001-2100 (no geometry)
 //   src/data/geo/<id>.json      visibility geometry, loaded per eclipse
+//                               (lunar grids are packed, see src/data/grid.ts)
 //
 // Sources:
 //   Solar catalog  https://eclipse.gsfc.nasa.gov/SEcat5/SE2001-2100.html
@@ -13,13 +14,16 @@
 import { mkdir, readdir, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { encodeGrid } from '../src/data/grid.ts'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const DATA_DIR = join(ROOT, 'src', 'data')
 const GEO_DIR = join(DATA_DIR, 'geo')
 
-const SCHEMA_VERSION = 1
-const WINDOW_YEARS = 10
+const SCHEMA_VERSION = 2
+// Fixed to the catalog's century so the dataset doesn't drift with each rebuild.
+const WINDOW_FROM = '2001-01-01T00:00:00Z'
+const WINDOW_TO = '2101-01-01T00:00:00Z'
 const BASE = 'https://eclipse.gsfc.nasa.gov'
 const SOLAR_CATALOG = `${BASE}/SEcat5/SE2001-2100.html`
 const LUNAR_CATALOG = `${BASE}/LEcat5/LE2001-2100.html`
@@ -28,6 +32,10 @@ const LUNAR_CATALOG = `${BASE}/LEcat5/LE2001-2100.html`
 // Used to move the lunar "Moon is up" cap across the penumbral event.
 const MOON_DEG_PER_HOUR = 14.49
 const GRID_STEP = 3 // degrees between lunar visibility grid points
+// The solar catalog has no global partial-phase duration, so the event window
+// is approximated as peak ± this many hours (real P1-P4 spans run ~2-5 h).
+const SOLAR_HALF_WINDOW_HOURS = 2.5
+const HOUR_MS = 3_600_000
 
 type EclipseType = 'solar' | 'lunar'
 type Kind = 'total' | 'annular' | 'hybrid' | 'partial' | 'penumbral'
@@ -37,6 +45,8 @@ interface Eclipse {
   type: EclipseType
   kind: Kind
   peakUtc: string
+  startUtc: string
+  endUtc: string
   magnitude: number
   gamma: number
   saros: number
@@ -91,6 +101,10 @@ function peakUtcIso(year: string, mon: string, day: string, time: string, deltaT
   return new Date(terrestrial - deltaT * 1000).toISOString().replace('.000Z', 'Z')
 }
 
+function shiftIso(iso: string, hours: number): string {
+  return new Date(Date.parse(iso) + hours * HOUR_MS).toISOString().replace('.000Z', 'Z')
+}
+
 function parseDeg(token: string): LatLon | null {
   // e.g. "6N" -> lat 6, "171W" -> lon -171
   const m = token.match(/^(\d+(?:\.\d+)?)([NSEW])$/)
@@ -121,8 +135,11 @@ function parseSolarRows(text: string, warnings: string[]): Candidate[] {
     const durationToken = g.rest.trim().split(/\s+/).find((t) => /^\d+m\d+s$/.test(t))
     const dur = durationToken?.match(/^(\d+)m(\d+)s$/) ?? null
     const block = 1901 + Math.floor((Number(year) - 1901) / 50) * 50
+    // Non-central eclipses ('+'/'-' suffix) only graze a pole: the shadow axis misses
+    // Earth, so NASA's page has no central line and there is no path to draw.
+    const nonCentral = /[+-]$/.test(typeCode)
     const pathUrl =
-      kind === 'partial'
+      kind === 'partial' || nonCentral
         ? null
         : `${BASE}/SEpath/SEpath${block}/SE${year}${mon}${day}${typeCode.charAt(0)}path.html`
     out.push({
@@ -131,6 +148,8 @@ function parseSolarRows(text: string, warnings: string[]): Candidate[] {
         type: 'solar',
         kind,
         peakUtc,
+        startUtc: shiftIso(peakUtc, -SOLAR_HALF_WINDOW_HOURS),
+        endUtc: shiftIso(peakUtc, SOLAR_HALF_WINDOW_HOURS),
         magnitude: Number(mag),
         gamma: Number(gamma),
         saros: Number(saros),
@@ -167,12 +186,20 @@ function parseLunarRows(text: string, warnings: string[]): Candidate[] {
       continue
     }
     const umbral = kind === 'total' || kind === 'partial'
+    const peakUtc = peakUtcIso(year, mon, day, time, Number(dT))
+    const halfPenumbralHours = Number(penDur) / 120 // full duration in minutes -> half in hours
+    if (!(halfPenumbralHours > 0)) {
+      warnings.push(`lunar penumbral duration not parsed: ${line.trim()}`)
+      continue
+    }
     out.push({
       eclipse: {
         id: `${year}-${String(MONTHS[mon]).padStart(2, '0')}-${day}-lunar`,
         type: 'lunar',
         kind,
-        peakUtc: peakUtcIso(year, mon, day, time, Number(dT)),
+        peakUtc,
+        startUtc: shiftIso(peakUtc, -halfPenumbralHours),
+        endUtc: shiftIso(peakUtc, halfPenumbralHours),
         magnitude: Number(umbral ? umbMag : penMag),
         gamma: Number(gamma),
         saros: Number(saros),
@@ -180,7 +207,7 @@ function parseLunarRows(text: string, warnings: string[]): Candidate[] {
         hasGeometry: true,
       },
       zenith: { lat: lat.lat, lon: lon.lon },
-      halfPenumbralHours: Number(penDur) / 120, // full duration in minutes -> half in hours
+      halfPenumbralHours,
       pathUrl: null,
     })
   }
@@ -278,7 +305,7 @@ function lunarGeometry(c: Candidate) {
   return {
     id: c.eclipse.id,
     schemaVersion: SCHEMA_VERSION,
-    grid: { step: GRID_STEP, zones: { 1: 'partial', 2: 'full' }, points },
+    grid: encodeGrid(points, GRID_STEP, { 1: 'partial', 2: 'full' }),
   }
 }
 
@@ -292,16 +319,17 @@ function validate(eclipses: Eclipse[], geo: Map<string, unknown>) {
     if (prev && e.peakUtc <= prev) errors.push(`peakUtc not ascending at ${e.id}`)
     prev = e.peakUtc
     if (!Number.isFinite(Date.parse(e.peakUtc))) errors.push(`bad peakUtc ${e.id}`)
+    if (!(e.startUtc < e.peakUtc && e.peakUtc < e.endUtc)) errors.push(`bad event window ${e.id}`)
     if (!Number.isFinite(e.magnitude)) errors.push(`bad magnitude ${e.id}`)
     if (e.hasGeometry && !geo.has(e.id)) errors.push(`missing geometry ${e.id}`)
   }
   for (const [id, g] of geo) {
-    const gg = g as { features?: { features: { geometry: { coordinates: unknown } }[] }; grid?: { points: [number, number, number][] } }
+    const gg = g as { features?: { features: { geometry: { coordinates: unknown } }[] }; grid?: { step: number; cells: string } }
     if (gg.grid) {
-      for (const [lat, lon, zone] of gg.grid.points) {
-        if (lat < -90 || lat > 90 || lon < -180 || lon > 180) errors.push(`grid out of range ${id}`)
-        if (zone !== 1 && zone !== 2) errors.push(`grid bad zone ${id}`)
-      }
+      const expected = (180 / gg.grid.step + 1) * (360 / gg.grid.step)
+      if (gg.grid.cells.length !== expected) errors.push(`grid has ${gg.grid.cells.length} cells, expected ${expected} ${id}`)
+      if (!/^[012]*$/.test(gg.grid.cells)) errors.push(`grid bad zone ${id}`)
+      if (!/[12]/.test(gg.grid.cells)) errors.push(`grid empty ${id}`)
     }
     if (gg.features) {
       const json = JSON.stringify(gg.features)
@@ -318,8 +346,8 @@ function validate(eclipses: Eclipse[], geo: Map<string, unknown>) {
 async function main() {
   const warnings: string[] = []
   const now = Date.now()
-  const until = new Date(now)
-  until.setUTCFullYear(until.getUTCFullYear() + WINDOW_YEARS)
+  const from = Date.parse(WINDOW_FROM)
+  const to = Date.parse(WINDOW_TO)
 
   console.log('Fetching NASA GSFC catalogs...')
   const [solarHtml, lunarHtml] = await Promise.all([fetchText(SOLAR_CATALOG), fetchText(LUNAR_CATALOG)])
@@ -328,14 +356,13 @@ async function main() {
   const candidates = [...parseSolarRows(solarHtml, warnings), ...parseLunarRows(lunarHtml, warnings)]
     .filter((c) => {
       const t = Date.parse(c.eclipse.peakUtc)
-      return t > now && t <= until.getTime()
+      return t >= from && t < to
     })
     .sort((a, b) => Date.parse(a.eclipse.peakUtc) - Date.parse(b.eclipse.peakUtc))
 
-  await rm(GEO_DIR, { recursive: true, force: true })
-  await mkdir(GEO_DIR, { recursive: true })
-
   const geo = new Map<string, unknown>()
+  const paths: Candidate[] = []
+  console.log(`Fetching ${candidates.filter((c) => c.pathUrl).length} solar path pages...`)
   for (const c of candidates) {
     const e = c.eclipse
     if (e.type === 'lunar') {
@@ -346,16 +373,23 @@ async function main() {
       e.hasGeometry = false
       continue
     }
-    const html = await fetchText(c.pathUrl)
+    paths.push(c)
+  }
+
+  // Every central eclipse must have a path; a missing page fails the build
+  // rather than quietly shipping an eclipse with no map.
+  const missingPaths: string[] = []
+  await forEachLimited(paths, 6, async (c) => {
+    const html = await fetchText(c.pathUrl as string)
     const path = html ? parsePathTable(html) : null
     if (!path || path.central.length === 0) {
-      warnings.push(`no path table for ${e.id} (${c.pathUrl})`)
-      e.hasGeometry = false
-      continue
+      missingPaths.push(`${c.eclipse.id} (${c.pathUrl})`)
+      return
     }
-    geo.set(e.id, solarGeometry(e.id, path))
-    e.hasGeometry = true
-  }
+    geo.set(c.eclipse.id, solarGeometry(c.eclipse.id, path))
+    c.eclipse.hasGeometry = true
+  })
+  if (missingPaths.length) throw new Error(`no path table for:\n  ${missingPaths.sort().join('\n  ')}`)
 
   const eclipses = candidates.map((c) => c.eclipse)
   for (const e of eclipses) {
@@ -363,6 +397,9 @@ async function main() {
   }
   validate(eclipses, geo)
 
+  // Only replace the old files once the new set is complete and valid.
+  await rm(GEO_DIR, { recursive: true, force: true })
+  await mkdir(GEO_DIR, { recursive: true })
   for (const [id, g] of geo) {
     await writeFile(join(GEO_DIR, `${id}.json`), JSON.stringify(g))
   }
@@ -370,7 +407,7 @@ async function main() {
   const index = {
     schemaVersion: SCHEMA_VERSION,
     generatedAt: new Date(now).toISOString(),
-    window: { from: new Date(now).toISOString(), to: until.toISOString() },
+    window: { from: WINDOW_FROM, to: WINDOW_TO },
     source: {
       catalog: 'Five Millennium Canon of Solar and Lunar Eclipses (Espenak & Meeus), NASA GSFC',
       solar: SOLAR_CATALOG,
@@ -389,6 +426,15 @@ async function main() {
   console.log(`Wrote ${eclipses.length} eclipses, ${files} geometry files.`)
   console.log('By type:', counts)
   if (warnings.length) console.log('Warnings:\n  ' + warnings.join('\n  '))
+}
+
+// Runs `fn` over `items` with at most `limit` in flight, to stay polite to NASA's server.
+async function forEachLimited<T>(items: T[], limit: number, fn: (item: T) => Promise<void>) {
+  let next = 0
+  const worker = async () => {
+    while (next < items.length) await fn(items[next++])
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
 }
 
 main().catch((err) => {

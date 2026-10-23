@@ -1,3 +1,5 @@
+import type { PackedGrid } from './grid'
+
 export type EclipseType = 'solar' | 'lunar'
 
 export type EclipseKind = 'total' | 'annular' | 'hybrid' | 'partial' | 'penumbral'
@@ -8,6 +10,9 @@ export interface EclipseSummary {
   kind: EclipseKind
   /** UTC peak time, ISO 8601 with trailing Z. Drives the countdown. */
   peakUtc: string
+  /** Start and end of the event, ISO 8601 UTC. Lunar: penumbral contacts. Solar: peak ± 2.5 h (approximate). */
+  startUtc: string
+  endUtc: string
   magnitude: number
   gamma: number
   saros: number
@@ -56,3 +61,13 @@ export interface LunarGeometry {
 }
 
 export type EclipseGeometry = SolarGeometry | LunarGeometry
+
+/** Lunar geometry as stored on disk: the grid is packed (see grid.ts) and decoded on load. */
+export interface LunarGeometryFile {
+  id: string
+  schemaVersion: number
+  features?: undefined
+  grid: PackedGrid
+}
+
+export type EclipseGeometryFile = SolarGeometry | LunarGeometryFile
