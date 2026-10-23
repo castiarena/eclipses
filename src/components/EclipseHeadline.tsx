@@ -1,5 +1,5 @@
 import { Box, Button, chakra, HStack, IconButton, Skeleton, Stack, Text, VisuallyHidden } from '@chakra-ui/react'
-import { useMemo, type FC } from 'react'
+import { useMemo, type FC, type Ref } from 'react'
 import type { EclipseSummary } from '../data/types'
 import { GLOBE_COLORS } from '../globe/palette'
 import { localYear } from '../hooks/timeline'
@@ -23,6 +23,8 @@ interface EclipseHeadlineProps {
    * way back to the next eclipse. Wide screens get a nav row with the arrows' target dates instead.
    */
   compact?: boolean
+  /** Compact only: the row holding the arrows and date, which the mobile sheet opens up to. */
+  dateRowRef?: Ref<HTMLDivElement>
 }
 
 const Chevron: FC<{ dir: 'left' | 'right' }> = ({ dir }) => (
@@ -156,6 +158,7 @@ export const EclipseHeadline: FC<EclipseHeadlineProps> = ({
   description,
   longEyebrow = false,
   compact = false,
+  dateRowRef,
 }) => {
   if (loading) {
     return (
@@ -201,7 +204,7 @@ export const EclipseHeadline: FC<EclipseHeadlineProps> = ({
       </HStack>
 
       {compact ? (
-        <HStack spacing={2} align="center">
+        <HStack ref={dateRowRef} spacing={2} align="center">
           <StepButton dir="left" target={browse.previous} onClick={browse.prev} />
           <Text as="h2" flex={1} fontSize="3xl" fontWeight="semibold" lineHeight="1.1" letterSpacing="-0.02em" textAlign="center" whiteSpace="nowrap">
             <Text as="span" display="block" fontSize="sm" fontWeight="medium" letterSpacing="normal" color="whiteAlpha.700" mb={1}>

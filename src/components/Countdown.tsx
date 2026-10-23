@@ -183,18 +183,31 @@ export const Countdown: FC<CountdownProps> = ({ eclipse, phase, target, remainin
   )
 }
 
+const eventPoints = (eclipse: EclipseSummary) => {
+  const approx = eclipse.type === 'solar' ? '~' : ''
+  return [
+    { key: 'start', label: `Starts ${approx}${formatEventTime(eclipse.startUtc, eclipse.peakUtc)}`, align: 'left' },
+    { key: 'peak', label: `Peak ${formatEventTime(eclipse.peakUtc, eclipse.peakUtc)}`, align: 'center' },
+    { key: 'end', label: `Ends ${approx}${formatEventTime(eclipse.endUtc, eclipse.peakUtc)}`, align: 'right' },
+  ] as const
+}
+
+/** The same three times on one line, for the mobile sheet's peek. */
+export const EventTimes: FC<{ eclipse: EclipseSummary }> = ({ eclipse }) => (
+  <Text fontFamily="mono" fontSize="xs" color="whiteAlpha.700" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+    {eventPoints(eclipse)
+      .map((p) => p.label)
+      .join(' · ')}
+  </Text>
+)
+
 /**
  * Start · peak · end in the viewer's time. Solar start and end are estimates (±2.5 h around the peak), so
  * they get a "~". The moment the countdown targets is drawn filled.
  */
 export const EventLine: FC<{ eclipse: EclipseSummary }> = ({ eclipse }) => {
-  const approx = eclipse.type === 'solar' ? '~' : ''
   const filled = eclipse.type === 'solar' ? 'peak' : 'start'
-  const points = [
-    { key: 'start', label: `Starts ${approx}${formatEventTime(eclipse.startUtc, eclipse.peakUtc)}`, align: 'left' },
-    { key: 'peak', label: `Peak ${formatEventTime(eclipse.peakUtc, eclipse.peakUtc)}`, align: 'center' },
-    { key: 'end', label: `Ends ${approx}${formatEventTime(eclipse.endUtc, eclipse.peakUtc)}`, align: 'right' },
-  ] as const
+  const points = eventPoints(eclipse)
   const color = eclipse.type === 'solar' ? 'solar.path' : 'lunar.whole'
 
   return (
