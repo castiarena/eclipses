@@ -125,6 +125,12 @@ export function formatEndsIn({ days, hours, minutes }: Remaining): string {
   return h > 0 ? `${h} h ${minutes} min` : `${minutes} min`
 }
 
+/** A distance as people plan by it: tens of km under 1,000, hundreds above. "180 km", "7,000 km". */
+export function formatKm(km: number): string {
+  const step = km < 1000 ? 10 : 100
+  return `${(Math.round(km / step) * step).toLocaleString('en-GB')} km`
+}
+
 export function formatMagnitude(value: number): string {
   return value.toFixed(3)
 }

@@ -1,8 +1,10 @@
 import { Box, Button, IconButton, Text } from '@chakra-ui/react'
 import { useMemo, useState, type FC } from 'react'
-import type { EclipseGeometry, EclipseSummary, EclipseType } from '../data/types'
+import type { EclipseGeometry, EclipseKind, EclipseSummary } from '../data/types'
 import type { Tense } from '../globe/describe'
-import { visibilityAt, type Point, type Visibility } from '../globe/visibility'
+import { locationVerdict, type LocationVerdict } from '../globe/distance'
+import type { Point } from '../globe/visibility'
+import { formatKm } from './format'
 
 type Status =
   | { kind: 'idle' }
@@ -11,67 +13,76 @@ type Status =
   | { kind: 'done'; position: Point }
 
 const UNKNOWN = 'The map cannot tell for this location.'
+const NO_MAP = 'There is no visibility map for this eclipse.'
 
-const MESSAGES: Record<Tense, Record<EclipseType, Record<Visibility, string>>> = {
+/** Within this distance of the centre line, a distance would be noise. */
+const ON_CENTRE_KM = 10
+
+const PATH_NAME: Partial<Record<EclipseKind, string>> = {
+  total: 'totality',
+  annular: 'annularity',
+  hybrid: 'totality or annularity',
+}
+
+const LUNAR: Record<Tense, Record<'whole' | 'part' | 'not-visible', string>> = {
   future: {
-    solar: {
-      central: 'Your location is in the path of totality or annularity.',
-      full: '',
-      partial: '',
-      none: 'Outside the mapped path. A partial view may still be possible; partial zones are not mapped yet.',
-      unknown: UNKNOWN,
-    },
-    lunar: {
-      central: '',
-      full: 'The Moon is up for the whole eclipse from your location.',
-      partial: 'The Moon is up for part of the eclipse from your location.',
-      none: 'The Moon is below the horizon from your location.',
-      unknown: UNKNOWN,
-    },
+    whole: 'The Moon is up for the whole eclipse from your location.',
+    part: 'The Moon is up for part of the eclipse from your location.',
+    'not-visible': 'The Moon is below the horizon from your location.',
   },
   present: {
-    solar: {
-      central: 'Your location is in the path of totality or annularity, and it is happening now.',
-      full: '',
-      partial: '',
-      none: 'Outside the mapped path. You may still see a partial eclipse now; partial zones are not mapped yet.',
-      unknown: UNKNOWN,
-    },
-    lunar: {
-      central: '',
-      full: 'The Moon is up for the whole eclipse from your location. Look up now.',
-      partial: 'The Moon is up for part of the eclipse from your location.',
-      none: 'The Moon is below the horizon from your location.',
-      unknown: UNKNOWN,
-    },
+    whole: 'The Moon is up for the whole eclipse from your location. Look up now.',
+    part: 'The Moon is up for part of the eclipse from your location.',
+    'not-visible': 'The Moon is below the horizon from your location.',
   },
   past: {
-    solar: {
-      central: 'Your location was in the path of totality or annularity.',
-      full: '',
-      partial: '',
-      none: 'Outside the mapped path. A partial view may have been possible; partial zones are not mapped.',
-      unknown: UNKNOWN,
-    },
-    lunar: {
-      central: '',
-      full: 'The Moon was up for the whole eclipse from your location.',
-      partial: 'The Moon was up for part of the eclipse from your location.',
-      none: 'The Moon was below the horizon from your location.',
-      unknown: UNKNOWN,
-    },
+    whole: 'The Moon was up for the whole eclipse from your location.',
+    part: 'The Moon was up for part of the eclipse from your location.',
+    'not-visible': 'The Moon was below the horizon from your location.',
   },
 }
 
-/** What to tell the viewer about one spot, or null for nothing to say. */
-export function locationMessage(type: EclipseType, visibility: Visibility, tense: Tense): string | null {
-  return MESSAGES[tense][type][visibility] || null
+/** What to tell the viewer about the shown eclipse from where they are. */
+export function verdictMessage(eclipse: Pick<EclipseSummary, 'type' | 'kind'>, verdict: LocationVerdict, tense: Tense): string {
+  const path = `path of ${PATH_NAME[eclipse.kind] ?? 'totality or annularity'}`
+  const is = tense === 'past' ? 'was' : 'is'
+  switch (verdict.kind) {
+    case 'in-path': {
+      const centre = verdict.toCentre
+      const where = !centre
+        ? ''
+        : centre.km < ON_CENTRE_KM
+          ? ', right by the centre line'
+          : `, ${formatKm(centre.km)} from the centre line`
+      const now = tense === 'present' ? ', and it is happening now' : ''
+      return `Your location ${is} in the ${path}${where}${now}.`
+    }
+    case 'near-path': {
+      const partial =
+        tense === 'past' ? 'A partial eclipse was likely visible from here.' : 'A partial eclipse is likely visible from here.'
+      return `The ${path} ${is} ${formatKm(verdict.toPath.km)} ${verdict.toPath.direction} of you. ${partial}`
+    }
+    case 'far-from-path': {
+      const partial = tense === 'past' ? 'A partial eclipse may have been visible' : 'A partial eclipse may still be visible'
+      return `The ${path} ${is} ${formatKm(verdict.toPath.km)} ${verdict.toPath.direction} of you. ${partial}; partial zones are not mapped.`
+    }
+    case 'whole':
+    case 'part':
+    case 'not-visible':
+      return LUNAR[tense][verdict.kind]
+    case 'unknown':
+      return UNKNOWN
+    case 'no-map':
+      return NO_MAP
+  }
 }
 
 export interface MyLocation {
   locating: boolean
   /** Where the viewer is, once they shared it. */
   position: Point | null
+  /** What they get from the shown eclipse, once its map has loaded. */
+  verdict: LocationVerdict | null
   /** What to tell the viewer, if anything. */
   message: string | null
   check: () => void
@@ -103,15 +114,15 @@ export function useMyLocation(
   }
 
   const position = status.kind === 'done' ? status.position : null
-  const message = useMemo(() => {
-    if (status.kind === 'error') return status.message
+  const verdict = useMemo(() => {
     if (!position || !eclipse) return null
-    if (!eclipse.hasGeometry) return 'There is no visibility map for this eclipse.'
-    if (!geometry) return null
-    return locationMessage(eclipse.type, visibilityAt(geometry, position), tense)
-  }, [status, position, eclipse, geometry, tense])
+    if (eclipse.hasGeometry && !geometry) return null
+    return locationVerdict(eclipse, geometry, position)
+  }, [position, eclipse, geometry])
 
-  return { locating: status.kind === 'locating', position, message, check }
+  const message = status.kind === 'error' ? status.message : eclipse && verdict ? verdictMessage(eclipse, verdict, tense) : null
+
+  return { locating: status.kind === 'locating', position, verdict, message, check }
 }
 
 const PinIcon: FC<{ size: number }> = ({ size }) => (

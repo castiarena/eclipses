@@ -3,6 +3,7 @@ import {
   formatDateWithoutYear,
   formatDuration,
   formatEventTime,
+  formatKm,
   formatLongSpan,
   formatEndsIn,
   formatShortDate,
@@ -126,5 +127,14 @@ describe('formatEventTime', () => {
     // Peak 23:12 UTC, end 01:13 UTC the next day: the end is a day later in UTC.
     expect(formatEventTime('2027-02-21T01:13:20Z', '2027-02-20T23:12:50Z', 'UTC')).toBe('01:13 (+1)')
     expect(formatEventTime('2027-02-20T21:12:20Z', '2027-02-21T00:12:50Z', 'UTC')).toBe('21:12 (−1)')
+  })
+})
+
+describe('formatKm', () => {
+  it('rounds to tens under 1,000 km and hundreds above, as distances people plan by', () => {
+    expect(formatKm(180.6)).toBe('180 km')
+    expect(formatKm(42)).toBe('40 km')
+    expect(formatKm(7028)).toBe('7,000 km')
+    expect(formatKm(2449)).toBe('2,400 km')
   })
 })
