@@ -7,6 +7,9 @@ export interface Remaining {
   seconds: number
 }
 
+/** Beyond this, a ticking day count is noise (and won't fit), so the countdown becomes a sentence. */
+export const TILES_MAX_MS = 365 * 86_400_000
+
 const SECOND = 1000
 const MINUTE = 60 * SECOND
 const HOUR = 60 * MINUTE

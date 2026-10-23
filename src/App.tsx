@@ -7,6 +7,7 @@ import { BackToNext, EclipseHeadline } from "./components/EclipseHeadline"
 import { EclipseTypeToggle } from "./components/EclipseTypeToggle"
 import { LegendInline, LegendPills } from "./components/Legend"
 import { MobileSheet } from "./components/MobileSheet"
+import { NextSteps, nextSteps } from "./components/NextSteps"
 import { formatDuration } from "./components/format"
 import { Starfield } from "./components/Starfield"
 import { hasAnswer, LocationButton, LocationCard, useMyLocation } from "./components/YourLocation"
@@ -99,6 +100,13 @@ const App = () => {
         </Suspense>
     )
 
+    // Past or far-off eclipses point to where to go next, in the space the tiles would take.
+    const steps = useMemo(
+        () => (eclipse && phase ? nextSteps(browser.list, eclipse, phase, browser.target, browser.now) : []),
+        // The steps only change by the minute, not with every tick of the countdown.
+        [browser.list, eclipse, phase, browser.target?.target, Math.floor(browser.now / 60_000)],
+    )
+
     const toggle = <EclipseTypeToggle value={filter} onChange={setFilter} onReselect={browser.reset} />
     const countdown = (shortLabels: boolean) => (
         <Countdown
@@ -153,6 +161,7 @@ const App = () => {
                             {/* The event line belongs to the countdown, so it sits closer to it than the rhythm between sections. */}
                             <Stack spacing={4}>
                                 {countdown(false)}
+                                <NextSteps steps={steps} onShow={browser.show} />
                                 {eclipse && <EventLine eclipse={eclipse} />}
                             </Stack>
                             {eclipse && (
@@ -206,6 +215,8 @@ const App = () => {
                 )}
             </HStack>
             <EventTimes eclipse={eclipse} />
+            {/* The first next step fits the peak; the rest wait in the open sheet. */}
+            <NextSteps steps={steps.slice(0, 1)} onShow={browser.show} compact />
         </Stack>
     )
 
@@ -256,6 +267,7 @@ const App = () => {
                 >
                     {/* Once the peek holds the location answer, the summary moves into the sheet. */}
                     {answered && summary}
+                    <NextSteps steps={steps.slice(1)} onShow={browser.show} compact />
                     <EclipseDetails eclipse={eclipse} compact />
                     <Footnote />
                 </MobileSheet>

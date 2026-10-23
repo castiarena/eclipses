@@ -32,6 +32,8 @@ export interface EclipseBrowser {
   next: () => void
   /** Pins the first eclipse in that (local) year; does nothing for an empty year. */
   jumpToYear: (year: number) => void
+  /** Pins the eclipse with this id, when it's in the current filter. */
+  show: (id: string) => void
   /** Back to the live view. */
   reset: () => void
   /** Local years with at least one eclipse in the current filter. */
@@ -96,6 +98,7 @@ export function useEclipseBrowser(
   const prev = useCallback(() => pinTo(previous), [pinTo, previous])
   const next = useCallback(() => pinTo(following), [pinTo, following])
   const jumpToYear = useCallback((year: number) => pinTo(list[firstIndexInYear(list, year)]), [pinTo, list])
+  const show = useCallback((id: string) => pinTo(list.find((e) => e.id === id)), [pinTo, list])
   const reset = useCallback(() => setPin({ filter, id: null }), [filter])
 
   return {
@@ -111,6 +114,7 @@ export function useEclipseBrowser(
     prev,
     next,
     jumpToYear,
+    show,
     reset,
     years,
     list,

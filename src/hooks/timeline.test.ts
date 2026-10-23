@@ -6,6 +6,8 @@ import {
   firstIndexInYear,
   liveIndex,
   nearestIndex,
+  nextInSaros,
+  nextOfKind,
   phaseOf,
   retarget,
   stepIndex,
@@ -217,5 +219,35 @@ describe('timelineStrip', () => {
 
   it('has nothing to draw without a selection', () => {
     expect(timelineStrip(solar, -1, at('2026-10-23T00:00:00Z'))).toBeNull()
+  })
+})
+
+describe('next steps', () => {
+  const series = (id: string, kind: EclipseSummary['kind'], saros: number, peakUtc: string): EclipseSummary => ({
+    ...eclipse(id, 'solar', peakUtc),
+    kind,
+    saros,
+  })
+  // A past total, then an annular, a total, and the same Saros returning 18 years on.
+  const list = [
+    series('t1', 'total', 126, '2026-08-12T17:45:00Z'),
+    series('a1', 'annular', 131, '2027-02-06T16:00:00Z'),
+    series('t2', 'total', 136, '2027-08-02T10:00:00Z'),
+    series('t3', 'total', 126, '2044-08-23T01:00:00Z'),
+  ]
+  const now = at('2026-10-23T00:00:00Z')
+
+  it('nextOfKind: the next eclipse of the same type and kind that has not ended', () => {
+    expect(nextOfKind(list, list[0], now)?.id).toBe('t2')
+    expect(nextOfKind(list, list[1], now)).toBeUndefined()
+  })
+
+  it('nextOfKind: never the eclipse itself, even while it is the next one', () => {
+    expect(nextOfKind(list, list[2], now)?.id).toBe('t3')
+  })
+
+  it('nextInSaros: the next member of the same series after this one', () => {
+    expect(nextInSaros(list, list[0])?.id).toBe('t3')
+    expect(nextInSaros(list, list[3])).toBeUndefined()
   })
 })
