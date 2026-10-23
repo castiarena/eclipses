@@ -13,7 +13,7 @@ const lunarGrid = (lngMin: number, lngMax: number): EclipseGeometry => {
       if (lng >= lngMin && lng <= lngMax) points.push([lat, lng, 2])
     }
   }
-  return { id: 'fixture-lunar', schemaVersion: 1, grid: { step: 3, zones: { 1: 'partial', 2: 'full' }, points } }
+  return { id: 'fixture-lunar', schemaVersion: 2, grid: { step: 3, zones: { 1: 'partial', 2: 'full' }, points } }
 }
 
 describe('describeVisibility', () => {
@@ -32,6 +32,7 @@ describe('describeVisibility', () => {
       'Visible from anywhere the Moon is above the horizon.',
     )
     expect(describeVisibility({ type: 'solar', kind: 'partial' }, null)).toMatch(/^A partial eclipse/)
+    expect(describeVisibility({ type: 'solar', kind: 'total' }, null)).toMatch(/only grazes the Earth near a pole/)
   })
 
   it('names the land the 2027-08-02 total solar path crosses', async () => {

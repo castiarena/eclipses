@@ -79,8 +79,12 @@ export function describeVisibility(
   }
 
   const noun = CENTRAL_NOUN[eclipse.kind]
-  if (!noun || !geometry?.features) {
+  if (!noun) {
     return 'A partial eclipse: the Moon covers part of the Sun as seen from a wide area. The exact zone is not mapped yet.'
+  }
+  if (!geometry?.features) {
+    // Non-central eclipse: the shadow only grazes a polar edge, so NASA maps no path.
+    return "The Moon's central shadow only grazes the Earth near a pole, so no path is mapped; a wider area sees a partial eclipse."
   }
   const regions = solarPathRegions(geometry)
   if (!regions.length) return `The path of ${noun} stays over open ocean; nearby coasts see a partial eclipse.`
