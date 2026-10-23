@@ -1,12 +1,13 @@
 import { Box, Divider, Flex, HStack, Stack, Text, useBreakpointValue } from "@chakra-ui/react"
-import { lazy, Suspense, useEffect, useMemo, useState, type FC } from "react"
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type FC } from "react"
 import { Brand } from "./components/Brand"
-import { Countdown, EventLine } from "./components/Countdown"
+import { Countdown, EventLine, EventTimes } from "./components/Countdown"
 import { EclipseDetails } from "./components/EclipseDetails"
 import { BackToNext, EclipseHeadline } from "./components/EclipseHeadline"
 import { EclipseTypeToggle } from "./components/EclipseTypeToggle"
 import { LegendInline, LegendPills } from "./components/Legend"
 import { MobileSheet } from "./components/MobileSheet"
+import { formatDuration } from "./components/format"
 import { Starfield } from "./components/Starfield"
 import { LocationButton, LocationMessage, useMyLocation } from "./components/YourLocation"
 import { describeVisibility, type Tense } from "./globe/describe"
@@ -67,6 +68,17 @@ const App = () => {
     useArrowKeys(browser.prev, browser.next)
 
     useEffect(() => writeFilterToUrl(filter), [filter])
+
+    // Mobile: the sheet opens up to just under the date row, and the globe keeps its subject above the peek.
+    const dateRowRef = useRef<HTMLDivElement>(null)
+    const [expandedTop, setExpandedTop] = useState(0)
+    const [peekHeight, setPeekHeight] = useState(0)
+    useLayoutEffect(() => {
+        const measure = () => setExpandedTop(dateRowRef.current ? dateRowRef.current.getBoundingClientRect().bottom + window.scrollY : 0)
+        measure()
+        window.addEventListener("resize", measure)
+        return () => window.removeEventListener("resize", measure)
+    }, [wide, loading, eclipse?.id])
 
     const description = useMemo(
         () => (eclipse && !geo.loading ? describeVisibility(eclipse, geo.geometry, tense) : undefined),
@@ -180,43 +192,71 @@ const App = () => {
         )
     }
 
+    // The peek's one key fact: the central duration, when there is one. Lunar legends have two items and need the room.
+    const keyFact = eclipse ? formatDuration(eclipse.durationSec) : null
+
     return (
         // `clip`, not `hidden`: a hidden box is still a scroll container, so focusing a control could scroll it
         // with no way back. Clipped, it can't scroll; when content is taller than the screen, the page scrolls.
         <Box position="relative" minH="100dvh" overflow="clip">
             <Starfield />
-            <Flex position="relative" zIndex={1} direction="column" minH="100dvh" px={5} pt={4} pb={5}>
-                <HStack justify="space-between" mb={5}>
-                    <Brand onClick={browser.reset} />
-                    <LocationButton location={location} compact />
-                </HStack>
-                <Stack spacing={5}>
+            <Flex position="relative" zIndex={1} direction="column" minH="100dvh" px={5} pt={4}>
+                {/* Above the globe, which reaches up behind the countdown (see below). */}
+                <Stack spacing={5} position="relative" zIndex={2}>
+                    <HStack justify="space-between">
+                        <Brand onClick={browser.reset} />
+                        <LocationButton location={location} compact />
+                    </HStack>
                     {toggle}
                     {/* Swipe left or right here to step; the globe and sheet keep their own drags. */}
                     <Stack spacing={5} {...swipe}>
-                        <EclipseHeadline eclipse={eclipse} loading={loading} browse={browser} description={description} compact />
+                        <EclipseHeadline
+                            eclipse={eclipse}
+                            loading={loading}
+                            browse={browser}
+                            description={description}
+                            compact
+                            dateRowRef={dateRowRef}
+                        />
                         {countdown(true)}
                     </Stack>
                     <LocationMessage location={location} />
                 </Stack>
 
-                {/* Window onto the globe; the globe runs on behind the sheet below. */}
-                <Box position="relative" flex={1} minH="180px" mx={-5}>
-                    <Box position="absolute" top={4} left={0} w="100vw" h="160vw" maxH="760px">
-                        {globe(1.5)}
+                {/*
+                  Window onto the globe, down to the bottom of the screen. The sheet's peek covers the bottom of it,
+                  so the globe's box reaches up by the peek's height: its centre, where the camera aims, then sits in
+                  the middle of the part that shows. At least 140 px always shows; on short phones the page scrolls.
+                */}
+                <Box position="relative" flex={1} minH={`${140 + peekHeight + 12}px`} mx={-5}>
+                    <Box position="absolute" left={0} w="100vw" top={`${-(peekHeight + 12)}px`} bottom={0}>
+                        {globe(2.2)}
                     </Box>
                 </Box>
-
-                {eclipse && (
-                    <MobileSheet header={<LegendInline eclipse={eclipse} />}>
-                        <Stack spacing={5}>
-                            <EventLine eclipse={eclipse} />
-                            <EclipseDetails eclipse={eclipse} compact />
-                            <Footnote />
-                        </Stack>
-                    </MobileSheet>
-                )}
             </Flex>
+
+            {eclipse && (
+                <MobileSheet
+                    expandedTop={expandedTop}
+                    onPeekHeight={setPeekHeight}
+                    header={
+                        <Stack spacing={2}>
+                            <HStack justify="space-between" spacing={3}>
+                                <LegendInline eclipse={eclipse} />
+                                {keyFact && (
+                                    <Text fontFamily="mono" fontSize="xs" color="whiteAlpha.700" flexShrink={0} ml="auto">
+                                        {keyFact}
+                                    </Text>
+                                )}
+                            </HStack>
+                            <EventTimes eclipse={eclipse} />
+                        </Stack>
+                    }
+                >
+                    <EclipseDetails eclipse={eclipse} compact />
+                    <Footnote />
+                </MobileSheet>
+            )}
         </Box>
     )
 }
