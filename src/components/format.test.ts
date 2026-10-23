@@ -2,13 +2,13 @@ import { describe, expect, it } from 'vitest'
 import {
   formatDateWithoutYear,
   formatDuration,
+  formatEventTime,
+  formatLongSpan,
   formatEndsIn,
   formatShortDate,
   formatSpan,
   formatHeadlineDate,
-  formatLocalShort,
   formatMagnitude,
-  formatUtc,
   formatUtcTime,
   formatWeekday,
   utcOffsetLabel,
@@ -16,12 +16,8 @@ import {
 
 const PEAK = '2027-02-06T15:59:32Z'
 
-describe('formatUtc', () => {
-  it('shows date and minute in UTC', () => {
-    expect(formatUtc(PEAK)).toBe('2027-02-06 15:59 UTC')
-  })
-
-  it('can show the time alone', () => {
+describe('formatUtcTime', () => {
+  it('shows the minute in UTC', () => {
     expect(formatUtcTime(PEAK)).toBe('15:59 UTC')
   })
 })
@@ -33,16 +29,6 @@ describe('formatHeadlineDate', () => {
 
   it('uses the local date, which can differ from the UTC one', () => {
     expect(formatHeadlineDate('2027-02-20T23:12:00Z', 'Asia/Tokyo')).toBe('Sunday, 21 February 2027')
-  })
-})
-
-describe('formatLocalShort', () => {
-  it('shows a short date and 24h time', () => {
-    expect(formatLocalShort(PEAK, {}, 'America/Argentina/Buenos_Aires')).toBe('6 Feb 2027 · 12:59')
-  })
-
-  it('can leave out the year', () => {
-    expect(formatLocalShort(PEAK, { withYear: false }, 'UTC')).toBe('6 Feb · 15:59')
   })
 })
 
@@ -119,5 +105,26 @@ describe('formatEndsIn', () => {
   it('shows hours and minutes, or minutes alone', () => {
     expect(formatEndsIn({ days: 0, hours: 1, minutes: 12, seconds: 5 })).toBe('1 h 12 min')
     expect(formatEndsIn({ days: 0, hours: 0, minutes: 12, seconds: 5 })).toBe('12 min')
+  })
+})
+
+describe('formatLongSpan', () => {
+  const DAY = 86_400_000
+  it('gives years and months for spans of a year or more', () => {
+    expect(formatLongSpan(17.85 * 365.25 * DAY)).toBe('17 years, 10 months')
+    expect(formatLongSpan(366 * DAY)).toBe('1 year')
+    expect(formatLongSpan(400 * DAY)).toBe('1 year, 1 month')
+  })
+})
+
+describe('formatEventTime', () => {
+  it('writes the local 24h time', () => {
+    expect(formatEventTime('2027-02-06T15:59:32Z', '2027-02-06T15:59:32Z', 'America/Argentina/Buenos_Aires')).toBe('12:59')
+  })
+
+  it('marks a time that falls on another local day than the peak', () => {
+    // Peak 23:12 UTC, end 01:13 UTC the next day: the end is a day later in UTC.
+    expect(formatEventTime('2027-02-21T01:13:20Z', '2027-02-20T23:12:50Z', 'UTC')).toBe('01:13 (+1)')
+    expect(formatEventTime('2027-02-20T21:12:20Z', '2027-02-21T00:12:50Z', 'UTC')).toBe('21:12 (−1)')
   })
 })
