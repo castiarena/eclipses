@@ -36,6 +36,9 @@ export interface EclipseBrowser {
   reset: () => void
   /** Local years with at least one eclipse in the current filter. */
   years: Set<number>
+  /** Eclipses in the current filter, earliest first, and the shown one's index (-1 when none). */
+  list: EclipseSummary[]
+  index: number
 }
 
 /**
@@ -110,5 +113,7 @@ export function useEclipseBrowser(
     jumpToYear,
     reset,
     years,
+    list,
+    index,
   }
 }

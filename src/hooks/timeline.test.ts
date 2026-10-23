@@ -9,6 +9,7 @@ import {
   phaseOf,
   retarget,
   stepIndex,
+  timelineStrip,
   yearsWithEclipses,
 } from './timeline'
 
@@ -176,5 +177,45 @@ describe('retarget', () => {
   it('falls back to live for an unknown id or an empty list', () => {
     expect(retarget(all, lunar, 'missing')).toBeNull()
     expect(retarget(all, [], 's1')).toBeNull()
+  })
+})
+
+describe('timelineStrip', () => {
+  const YEAR = 365 * 24 * HOUR
+  // s1 2027-02-06 · s2 2027-08-02 · s3 2029-01-01; a ±1 year window keeps the numbers readable.
+  const strip = (index: number, now: string) => timelineStrip(solar, index, at(now), YEAR)!
+
+  it('centres the selected eclipse and places its neighbours in the window', () => {
+    const s = strip(1, '2026-10-23T00:00:00Z')
+    expect(s.dots.map((d) => [d.id, d.selected])).toEqual([
+      ['s1', false],
+      ['s2', true],
+    ])
+    expect(s.dots[1].x).toBe(0.5)
+    expect(s.dots[0].x).toBeCloseTo(0.5 - (at('2027-08-02T10:00:00Z') - at('2027-02-06T16:00:00Z')) / (2 * YEAR))
+  })
+
+  it('marks now inside the window, and the stretch between now and the selection', () => {
+    const s = strip(1, '2026-10-23T00:00:00Z')
+    expect('x' in s.now && s.now.x).toBeCloseTo(0.5 - (at('2027-08-02T10:00:00Z') - at('2026-10-23T00:00:00Z')) / (2 * YEAR))
+    expect(s.span.to).toBe(0.5)
+    expect(s.span.from).toBeLessThan(0.5)
+  })
+
+  it('points to now from the edge when it is outside the window', () => {
+    const s = strip(2, '2026-10-23T00:00:00Z')
+    expect(s.now).toEqual({ edge: 'start', distanceMs: at('2029-01-01T01:00:00Z') - at('2026-10-23T00:00:00Z') })
+    expect(s.span).toEqual({ from: 0, to: 0.5 })
+    expect(strip(0, '2031-01-01T00:00:00Z').now).toMatchObject({ edge: 'end' })
+  })
+
+  it('shows where the catalog starts or ends when that falls in the window', () => {
+    expect(strip(1, '2026-10-23T00:00:00Z').catalogStart).toBeCloseTo(strip(1, '2026-10-23T00:00:00Z').dots[0].x)
+    expect(strip(1, '2026-10-23T00:00:00Z').catalogEnd).toBeNull()
+    expect(strip(2, '2026-10-23T00:00:00Z').catalogEnd).toBe(0.5)
+  })
+
+  it('has nothing to draw without a selection', () => {
+    expect(timelineStrip(solar, -1, at('2026-10-23T00:00:00Z'))).toBeNull()
   })
 })
