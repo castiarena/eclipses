@@ -5,16 +5,58 @@ export interface GlobePoint {
   lng: number
 }
 
+export type Region = { zone: 'central' | 'full' | 'partial'; geometry: { type: 'Polygon'; coordinates: number[][][] } }
+
 export interface GlobeLayers {
-  /** Lunar grid points, colored by zone. */
-  points: (GlobePoint & { zone: 'full' | 'partial' })[]
   /** Each entry is one continuous line, drawn as a path. */
   paths: { zone: 'limits' | 'centerline'; points: GlobePoint[] }[]
   /** Solar central-path fill. Only present when the path does not cross the antimeridian. */
-  polygons: { zone: 'central'; geometry: { type: 'Polygon'; coordinates: number[][][] } }[]
+  polygons: Region[]
+  /** Lunar zones as rectangles (see `gridRegions`), painted onto one texture rather than drawn as polygons. */
+  zones: Region[]
 }
 
 const LUNAR_ZONE: Record<number, 'full' | 'partial'> = { 1: 'partial', 2: 'full' }
+
+type GridPoint = [lat: number, lon: number, zone: number]
+
+// Clockwise in lon/lat, like the solar paths.
+const rect = (west: number, south: number, east: number, north: number) => [
+  [west, south],
+  [west, north],
+  [east, north],
+  [east, south],
+  [west, south],
+]
+
+/**
+ * The lunar grid as shaded regions: each point stands for a `step`-wide cell, and neighbouring cells of
+ * the same zone along a row merge into one rectangle (a few hundred per eclipse). Shading cells, instead of
+ * drawing a dot per point, stops the grid bunching up at the poles.
+ */
+export function gridRegions(points: GridPoint[], step: number): Region[] {
+  const half = step / 2
+  const rows = new Map<number, GridPoint[]>()
+  for (const p of points) rows.set(p[0], [...(rows.get(p[0]) ?? []), p])
+
+  const regions: Region[] = []
+  for (const lat of [...rows.keys()].sort((a, b) => a - b)) {
+    const row = rows.get(lat)!.sort((a, b) => a[1] - b[1])
+    const south = Math.max(-90, lat - half)
+    const north = Math.min(90, lat + half)
+    let start = 0
+    for (let i = 1; i <= row.length; i++) {
+      const ends = i === row.length || row[i][2] !== row[start][2] || Math.abs(row[i][1] - row[i - 1][1] - step) > 1e-9
+      if (!ends) continue
+      regions.push({
+        zone: LUNAR_ZONE[row[start][2]],
+        geometry: { type: 'Polygon', coordinates: [rect(row[start][1] - half, south, row[i - 1][1] + half, north)] },
+      })
+      start = i
+    }
+  }
+  return regions
+}
 
 /**
  * Splits a [lon, lat] line wherever it jumps more than 180° in longitude, which
@@ -45,14 +87,10 @@ function feature(geometry: EclipseGeometry, zone: string): GeoFeature | undefine
 
 /** Converts stored geometry into the layers the globe draws. */
 export function buildLayers(geometry: EclipseGeometry): GlobeLayers {
-  const layers: GlobeLayers = { points: [], paths: [], polygons: [] }
+  const layers: GlobeLayers = { paths: [], polygons: [], zones: [] }
 
   if (geometry.grid) {
-    layers.points = geometry.grid.points.map(([lat, lng, zone]) => ({
-      lat,
-      lng,
-      zone: LUNAR_ZONE[zone],
-    }))
+    layers.zones = gridRegions(geometry.grid.points, geometry.grid.step)
     return layers
   }
 
