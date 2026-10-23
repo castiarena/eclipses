@@ -48,16 +48,18 @@ export function formatHeadlineDate(iso: string, timeZone?: string): string {
 }
 
 /**
- * Headline date without the year, which the headline renders as a picker. "Saturday, 6 February", or "6 Feb"
- * on narrow screens, which show the weekday on its own line so the date never wraps.
+ * Headline date without the year, which the headline renders as a picker: "6 February", or "6 Feb" on narrow
+ * screens. The weekday goes on its own line (`formatWeekday`), so the date never breaks in the middle.
  */
 export function formatDateWithoutYear(iso: string, { short = false } = {}, timeZone?: string): string {
-  if (short) {
-    const p = dateParts(iso, { day: 'numeric', month: 'short' }, timeZone)
-    return `${p.day} ${p.month}`
-  }
-  const p = dateParts(iso, { weekday: 'long', day: 'numeric', month: 'long' }, timeZone)
-  return `${p.weekday}, ${p.day} ${p.month}`
+  const p = dateParts(iso, { day: 'numeric', month: short ? 'short' : 'long' }, timeZone)
+  return `${p.day} ${p.month}`
+}
+
+/** Local date for the arrow targets, e.g. "6 Feb 2027". */
+export function formatShortDate(iso: string, timeZone?: string): string {
+  const p = dateParts(iso, { day: 'numeric', month: 'short', year: 'numeric' }, timeZone)
+  return `${p.day} ${p.month} ${p.year}`
 }
 
 /** Local weekday, e.g. "Saturday". */
