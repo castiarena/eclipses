@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { defaultRepository, type EclipseRepository } from '../data/repository'
 import type { EclipseFilter, EclipseSummary } from '../data/types'
-import { remainingUntil, type Remaining } from './countdown'
+import { countdownTarget, remainingUntil, type CountdownTarget, type Remaining } from './countdown'
 import {
   currentIndex,
   filterTimeline,
@@ -16,7 +16,9 @@ import {
 export interface EclipseBrowser {
   eclipse: EclipseSummary | undefined
   phase: Phase | undefined
-  /** Time until the start while upcoming, until the end while happening, null once past. */
+  /** What the countdown counts to (see `countdownTarget`), null once past. */
+  target: CountdownTarget | null
+  /** Time until `target`. */
   remaining: Remaining | null
   /** The clock the phase and remaining time were computed from (ticks every second). */
   now: number
@@ -81,12 +83,8 @@ export function useEclipseBrowser(
   const following = list[stepIndex(list, pinnedId, now, 1)]
 
   const phase = eclipse ? phaseOf(eclipse, now) : undefined
-  const remaining =
-    eclipse && phase === 'upcoming'
-      ? remainingUntil(Date.parse(eclipse.startUtc), now)
-      : eclipse && phase === 'now'
-        ? remainingUntil(Date.parse(eclipse.endUtc), now)
-        : null
+  const target = eclipse ? countdownTarget(eclipse, now) : null
+  const remaining = target ? remainingUntil(target.atMs, now) : null
 
   const pinTo = useCallback((target: EclipseSummary | undefined) => {
     if (target) setPin({ filter, id: target.id })
@@ -100,6 +98,7 @@ export function useEclipseBrowser(
   return {
     eclipse,
     phase,
+    target,
     remaining,
     now,
     isLive: pinnedId === null,

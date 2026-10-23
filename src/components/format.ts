@@ -31,11 +31,6 @@ function dateParts(iso: string, options: Intl.DateTimeFormatOptions, timeZone?: 
   return Object.fromEntries(parts.map((p) => [p.type, p.value])) as Record<string, string>
 }
 
-/** "2027-02-06T15:59:32Z" -> "2027-02-06 15:59 UTC" */
-export function formatUtc(iso: string): string {
-  return `${iso.slice(0, 10)} ${iso.slice(11, 16)} UTC`
-}
-
 /** "2027-02-06T15:59:32Z" -> "15:59 UTC" */
 export function formatUtcTime(iso: string): string {
   return `${iso.slice(11, 16)} UTC`
@@ -67,15 +62,15 @@ export function formatWeekday(iso: string, timeZone?: string): string {
   return dateParts(iso, { weekday: 'long' }, timeZone).weekday
 }
 
-/** Local date and 24h time, e.g. "6 Feb 2027 · 12:59", or "6 Feb · 12:59" without the year. */
-export function formatLocalShort(iso: string, { withYear = true } = {}, timeZone?: string): string {
-  const p = dateParts(
-    iso,
-    { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' },
-    timeZone,
-  )
-  const date = withYear ? `${p.day} ${p.month} ${p.year}` : `${p.day} ${p.month}`
-  return `${date} · ${p.hour}:${p.minute}`
+/** Local 24h time of one of the eclipse's moments, e.g. "12:59", with "(+1)" or "(−1)" when it falls on another local day than the peak. */
+export function formatEventTime(iso: string, peakIso: string, timeZone?: string): string {
+  const options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }
+  const p = dateParts(iso, options, timeZone)
+  const q = dateParts(peakIso, options, timeZone)
+  const dayOf = (x: Record<string, string>) => Date.UTC(Number(x.year), Number(x.month) - 1, Number(x.day)) / 86_400_000
+  const shift = dayOf(p) - dayOf(q)
+  const time = `${p.hour}:${p.minute}`
+  return shift === 0 ? time : `${time} (${shift > 0 ? '+' : '−'}${Math.abs(shift)})`
 }
 
 /** The viewer's offset at that moment, e.g. "UTC−3", "UTC+5:30" or "UTC". */
@@ -112,7 +107,19 @@ export function formatSpan(ms: number): string {
   return 'a moment'
 }
 
-/** Time left in a happening eclipse: "1 h 12 min", or "12 min" under an hour. */
+const YEAR = 365.25 * 86_400_000
+const MONTH = 30.44 * 86_400_000
+
+/** Spans of a year or more in years and months ("17 years, 10 months"); shorter ones as `formatSpan`. */
+export function formatLongSpan(ms: number): string {
+  const years = Math.floor(Math.abs(ms) / YEAR)
+  if (years < 1) return formatSpan(ms)
+  const months = Math.floor((Math.abs(ms) - years * YEAR) / MONTH)
+  const y = `${years} year${years === 1 ? '' : 's'}`
+  return months ? `${y}, ${months} month${months === 1 ? '' : 's'}` : y
+}
+
+/** Time left to the peak or end of a happening eclipse: "1 h 12 min", or "12 min" under an hour. */
 export function formatEndsIn({ days, hours, minutes }: Remaining): string {
   const h = days * 24 + hours
   return h > 0 ? `${h} h ${minutes} min` : `${minutes} min`

@@ -1,7 +1,7 @@
 import { Box, Divider, Flex, HStack, Stack, Text, useBreakpointValue } from "@chakra-ui/react"
 import { lazy, Suspense, useEffect, useMemo, useState, type FC } from "react"
 import { Brand } from "./components/Brand"
-import { Countdown } from "./components/Countdown"
+import { Countdown, EventLine } from "./components/Countdown"
 import { EclipseDetails } from "./components/EclipseDetails"
 import { BackToNext, EclipseHeadline } from "./components/EclipseHeadline"
 import { EclipseTypeToggle } from "./components/EclipseTypeToggle"
@@ -91,6 +91,7 @@ const App = () => {
         <Countdown
             eclipse={eclipse}
             phase={phase}
+            target={browser.target}
             remaining={browser.remaining}
             now={browser.now}
             loading={loading}
@@ -130,14 +131,18 @@ const App = () => {
                         </Box>
                     </Flex>
 
-                    <Flex flex={1} align="center" py={10} {...passThrough}>
+                    <Flex flex={1} align="center" py={6} {...passThrough}>
                         <Stack spacing={{ lg: 6, "2xl": 7 }} w="560px">
                             <HStack spacing={4}>
                                 {toggle}
                                 {!browser.isLive && <BackToNext onClick={browser.reset} />}
                             </HStack>
                             <EclipseHeadline eclipse={eclipse} loading={loading} browse={browser} description={description} longEyebrow />
-                            {countdown(false)}
+                            {/* The event line belongs to the countdown, so it sits closer to it than the rhythm between sections. */}
+                            <Stack spacing={4}>
+                                {countdown(false)}
+                                {eclipse && <EventLine eclipse={eclipse} />}
+                            </Stack>
                             {eclipse && (
                                 <>
                                     <Divider borderColor="whiteAlpha.200" />
@@ -205,6 +210,7 @@ const App = () => {
                 {eclipse && (
                     <MobileSheet header={<LegendInline eclipse={eclipse} />}>
                         <Stack spacing={5}>
+                            <EventLine eclipse={eclipse} />
                             <EclipseDetails eclipse={eclipse} compact />
                             <Footnote />
                         </Stack>
