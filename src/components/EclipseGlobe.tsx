@@ -2,7 +2,9 @@ import { Box, Text } from '@chakra-ui/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Globe, { type GlobeMethods } from 'react-globe.gl'
 import type { EclipseGeometry, EclipseType } from '../data/types'
-import { buildLayers, centerOf } from '../globe/layers'
+import { CanvasTexture, MeshBasicMaterial, SRGBColorSpace } from 'three'
+import { buildLayers, centerOf, type Region } from '../globe/layers'
+import { paintZones } from '../globe/zoneTexture'
 import { GLOBE_COLORS } from '../globe/palette'
 import type { Point } from '../globe/visibility'
 
@@ -30,6 +32,27 @@ interface EclipseGlobeProps {
   you?: Point | null
   /** Nearest point of the path, when the viewer is near it: a dashed line runs there from the pin. */
   toPath?: Point | null
+}
+
+/** Lunar zones are painted onto one equirectangular texture this size, draped over the globe as a single tile. */
+const ZONE_TEXTURE = { width: 2048, height: 1024 }
+const WHOLE_GLOBE_TILE = [{ lat: 0, lng: 0, width: 360, height: 180 }]
+
+function zoneMaterial(zones: Region[]) {
+  const canvas = document.createElement('canvas')
+  canvas.width = ZONE_TEXTURE.width
+  canvas.height = ZONE_TEXTURE.height
+  const ctx = canvas.getContext('2d')
+  if (ctx) {
+    paintZones(ctx, zones, {
+      wholeFill: GLOBE_COLORS.lunarWholeFill,
+      partFill: GLOBE_COLORS.lunarPartFill,
+      hatch: GLOBE_COLORS.lunarHatch,
+    })
+  }
+  const map = new CanvasTexture(canvas)
+  map.colorSpace = SRGBColorSpace
+  return new MeshBasicMaterial({ map, transparent: true, depthWrite: false })
 }
 
 /** The "You" pin: a solid white marker with a label, drawn as HTML over the globe so it stays crisp. */
@@ -64,6 +87,14 @@ export default function EclipseGlobe({ type, geometry, altitude, you = null, toP
   const layers = useMemo(() => (geometry ? buildLayers(geometry) : null), [geometry])
   const center = useMemo(() => (geometry ? centerOf(geometry) : null), [geometry])
   const markers = useMemo(() => (you ? [you] : []), [you])
+  const zones = useMemo(() => (layers?.zones.length ? zoneMaterial(layers.zones) : null), [layers])
+  useEffect(
+    () => () => {
+      zones?.map?.dispose()
+      zones?.dispose()
+    },
+    [zones],
+  )
   const paths = useMemo(() => {
     const base: { zone: string; points: Point[] }[] = layers?.paths ?? []
     return you && toPath ? [...base, { zone: 'toPath', points: [you, toPath] }] : base
@@ -117,16 +148,15 @@ export default function EclipseGlobe({ type, geometry, altitude, you = null, toP
           atmosphereColor={GLOBE_COLORS.atmosphere}
           atmosphereAltitude={0.12}
           onGlobeReady={() => setReady(true)}
-          // Lunar: grid points colored by zone.
-          pointsData={layers?.points ?? []}
-          pointLat="lat"
-          pointLng="lng"
-          pointAltitude={0.003}
-          pointRadius={0.62}
-          pointResolution={8}
-          pointColor={(p: object) =>
-            (p as { zone: string }).zone === 'full' ? GLOBE_COLORS.lunarWhole : GLOBE_COLORS.lunarPart
-          }
+          // Lunar: the zones, painted onto one texture over the whole globe.
+          tilesData={zones ? WHOLE_GLOBE_TILE : []}
+          tileLat="lat"
+          tileLng="lng"
+          tileWidth="width"
+          tileHeight="height"
+          tileAltitude={0.004}
+          tileMaterial={() => zones!}
+          tileCurvatureResolution={2}
           // Solar: central path fill, outline and centre line.
           polygonsData={layers?.polygons ?? []}
           polygonGeoJsonGeometry={(d: object) => (d as { geometry: { type: string; coordinates: number[] } }).geometry}

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { JsonEclipseRepository } from '../data/repository'
 import type { EclipseGeometry } from '../data/types'
-import { buildLayers, centerOf, splitAtAntimeridian } from './layers'
+import { buildLayers, centerOf, gridRegions, splitAtAntimeridian } from './layers'
 
 const solarFixture = (ring: number[][], line: number[][]): EclipseGeometry => ({
   id: 'fixture-solar',
@@ -70,7 +70,7 @@ describe('buildLayers', () => {
     expect(layers.paths.some((p) => p.zone === 'limits')).toBe(true)
   })
 
-  it('lunar: maps zone codes to names', () => {
+  it('lunar: turns the grid into zone regions, with no polygons or paths', () => {
     const layers = buildLayers({
       id: 'fixture-lunar',
       schemaVersion: 1,
@@ -83,10 +83,51 @@ describe('buildLayers', () => {
         ],
       },
     })
-    expect(layers.points).toEqual([
-      { lat: 0, lng: 0, zone: 'partial' },
-      { lat: 3, lng: 3, zone: 'full' },
+    expect(layers.zones.map((p) => p.zone).sort()).toEqual(['full', 'partial'])
+    expect(layers.polygons).toEqual([])
+    expect(layers.paths).toEqual([])
+  })
+})
+
+describe('gridRegions', () => {
+  // Clockwise, like the solar paths.
+  const ring = (w: number, s: number, e: number, n: number) => [
+    [w, s],
+    [w, n],
+    [e, n],
+    [e, s],
+    [w, s],
+  ]
+
+  it('merges neighbouring cells of a row and zone into one rectangle', () => {
+    const regions = gridRegions(
+      [
+        [0, 0, 2],
+        [0, 3, 2],
+        [0, 6, 2],
+        [0, 9, 1],
+        [0, 15, 2],
+      ],
+      3,
+    )
+    expect(regions).toEqual([
+      { zone: 'full', geometry: { type: 'Polygon', coordinates: [ring(-1.5, -1.5, 7.5, 1.5)] } },
+      { zone: 'partial', geometry: { type: 'Polygon', coordinates: [ring(7.5, -1.5, 10.5, 1.5)] } },
+      { zone: 'full', geometry: { type: 'Polygon', coordinates: [ring(13.5, -1.5, 16.5, 1.5)] } },
     ])
+  })
+
+  it('keeps rows apart and stops at the poles', () => {
+    const regions = gridRegions(
+      [
+        [90, 0, 2],
+        [87, 0, 2],
+      ],
+      3,
+    )
+    expect(regions).toHaveLength(2)
+    expect(regions[0].geometry.coordinates[0][2]).toEqual([1.5, 88.5]) // north-east corner
+    expect(regions[1].geometry.coordinates[0][2]).toEqual([1.5, 90])
   })
 })
 

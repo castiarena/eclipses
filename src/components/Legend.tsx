@@ -8,8 +8,8 @@ interface LegendItem {
   label: string
   shortLabel: string
   color: string
-  /** Bar for a path, dot for an area. */
-  mark: 'dot' | 'bar'
+  /** Bar for a path; a swatch for an area, solid or hatched like its pattern on the globe. */
+  mark: 'bar' | 'area' | 'hatched'
 }
 
 /** What the globe is drawing for this eclipse, or nothing when it draws no zones. */
@@ -17,20 +17,28 @@ export function legendFor(eclipse: EclipseSummary): LegendItem[] {
   if (!eclipse.hasGeometry) return []
   if (eclipse.type === 'lunar') {
     return [
-      { label: 'Moon up for whole eclipse', shortLabel: 'Whole eclipse', color: GLOBE_COLORS.lunarWhole, mark: 'dot' },
-      { label: 'Moon up for part', shortLabel: 'Part of it', color: GLOBE_COLORS.lunarPart, mark: 'dot' },
+      { label: 'Moon up the whole time', shortLabel: 'Whole eclipse', color: GLOBE_COLORS.lunarWhole, mark: 'area' },
+      { label: 'For part of it', shortLabel: 'Part of it', color: GLOBE_COLORS.lunarHatch, mark: 'hatched' },
     ]
   }
   const label = CENTRAL_PATH_LABEL[eclipse.kind]
   return label ? [{ label, shortLabel: label, color: GLOBE_COLORS.solarLimits, mark: 'bar' }] : []
 }
 
-const Mark: FC<{ item: LegendItem }> = ({ item }) =>
-  item.mark === 'bar' ? (
-    <Box w="20px" h="5px" borderRadius="full" bg={item.color} flexShrink={0} />
+const Mark: FC<{ item: LegendItem }> = ({ item }) => {
+  if (item.mark === 'bar') return <Box w="20px" h="5px" borderRadius="full" bg={item.color} flexShrink={0} />
+  const swatch = { w: '16px', h: '12px', borderRadius: '3px', flexShrink: 0, border: '1px solid' } as const
+  return item.mark === 'area' ? (
+    <Box {...swatch} bg={GLOBE_COLORS.lunarWholeFill} borderColor={item.color} />
   ) : (
-    <Box w="9px" h="9px" borderRadius="full" bg={item.color} flexShrink={0} />
+    <Box
+      {...swatch}
+      borderColor="rgba(160, 140, 255, 0.5)"
+      bg={GLOBE_COLORS.lunarPartFill}
+      backgroundImage={`repeating-linear-gradient(-45deg, ${item.color} 0 1.5px, transparent 1.5px 4px)`}
+    />
   )
+}
 
 /** Desktop: one glass pill per item. */
 export const LegendPills: FC<{ eclipse: EclipseSummary }> = ({ eclipse }) => (
