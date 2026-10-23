@@ -9,7 +9,7 @@ import { LegendInline, LegendPills } from "./components/Legend"
 import { MobileSheet } from "./components/MobileSheet"
 import { formatDuration } from "./components/format"
 import { Starfield } from "./components/Starfield"
-import { LocationButton, LocationMessage, useMyLocation } from "./components/YourLocation"
+import { hasAnswer, LocationButton, LocationCard, useMyLocation } from "./components/YourLocation"
 import { describeVisibility, type Tense } from "./globe/describe"
 import type { Phase } from "./hooks/timeline"
 import { useEclipseBrowser } from "./hooks/useEclipseBrowser"
@@ -94,6 +94,7 @@ const App = () => {
                 geometry={shown}
                 altitude={altitude}
                 you={location.position}
+                toPath={location.verdict?.kind === "near-path" ? location.verdict.toPath.to : null}
             />
         </Suspense>
     )
@@ -135,16 +136,15 @@ const App = () => {
                 >
                     <Flex justify="space-between" align="flex-start" {...passThrough}>
                         <Brand onClick={browser.reset} />
-                        <Box position="relative">
-                            <LocationButton location={location} />
-                            <Box position="absolute" top="calc(100% + 12px)" right={0}>
-                                <LocationMessage location={location} />
-                            </Box>
-                        </Box>
+                        <LocationButton location={location} />
                     </Flex>
 
                     <Flex flex={1} align="center" py={6} {...passThrough}>
-                        <Stack spacing={{ lg: 6, "2xl": 7 }} w="560px">
+                        <Stack spacing={{ lg: 6, "2xl": 7 }} w="560px" position="relative">
+                            {/* The answer to "can I see it from here?", beside the question, over the globe's edge. */}
+                            <Box position="absolute" left="calc(100% + 48px)" top="96px">
+                                <LocationCard location={location} eclipse={eclipse} tense={tense} />
+                            </Box>
                             <HStack spacing={4}>
                                 {toggle}
                                 {!browser.isLive && <BackToNext onClick={browser.reset} />}
@@ -194,6 +194,20 @@ const App = () => {
 
     // The peek's one key fact: the central duration, when there is one. Lunar legends have two items and need the room.
     const keyFact = eclipse ? formatDuration(eclipse.durationSec) : null
+    const answered = hasAnswer(location)
+    const summary = eclipse && (
+        <Stack spacing={2}>
+            <HStack justify="space-between" spacing={3}>
+                <LegendInline eclipse={eclipse} />
+                {keyFact && (
+                    <Text fontFamily="mono" fontSize="xs" color="whiteAlpha.700" flexShrink={0} ml="auto">
+                        {keyFact}
+                    </Text>
+                )}
+            </HStack>
+            <EventTimes eclipse={eclipse} />
+        </Stack>
+    )
 
     return (
         // `clip`, not `hidden`: a hidden box is still a scroll container, so focusing a control could scroll it
@@ -220,7 +234,6 @@ const App = () => {
                         />
                         {countdown(true)}
                     </Stack>
-                    <LocationMessage location={location} />
                 </Stack>
 
                 {/*
@@ -239,20 +252,10 @@ const App = () => {
                 <MobileSheet
                     expandedTop={expandedTop}
                     onPeekHeight={setPeekHeight}
-                    header={
-                        <Stack spacing={2}>
-                            <HStack justify="space-between" spacing={3}>
-                                <LegendInline eclipse={eclipse} />
-                                {keyFact && (
-                                    <Text fontFamily="mono" fontSize="xs" color="whiteAlpha.700" flexShrink={0} ml="auto">
-                                        {keyFact}
-                                    </Text>
-                                )}
-                            </HStack>
-                            <EventTimes eclipse={eclipse} />
-                        </Stack>
-                    }
+                    header={answered ? <LocationCard location={location} eclipse={eclipse} tense={tense} compact /> : summary}
                 >
+                    {/* Once the peek holds the location answer, the summary moves into the sheet. */}
+                    {answered && summary}
                     <EclipseDetails eclipse={eclipse} compact />
                     <Footnote />
                 </MobileSheet>

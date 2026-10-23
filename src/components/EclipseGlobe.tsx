@@ -26,12 +26,25 @@ interface EclipseGlobeProps {
   geometry: EclipseGeometry | null
   /** Camera distance in globe radii; smaller is closer. */
   altitude: number
-  /** Viewer's position, marked with a pulsing ring. */
+  /** Viewer's position, marked with a "You" pin. */
   you?: Point | null
+  /** Nearest point of the path, when the viewer is near it: a dashed line runs there from the pin. */
+  toPath?: Point | null
+}
+
+/** The "You" pin: a solid white marker with a label, drawn as HTML over the globe so it stays crisp. */
+function youMarker(): HTMLElement {
+  const el = document.createElement('div')
+  el.setAttribute('aria-hidden', 'true')
+  el.style.cssText = 'display:flex;align-items:flex-end;gap:4px;transform:translate(-11px,-100%);pointer-events:none;'
+  el.innerHTML =
+    '<svg width="22" height="28" viewBox="0 0 22 28"><path d="M11 27s-10-9-10-16a10 10 0 0 1 20 0c0 7-10 16-10 16z" fill="#fff"/><circle cx="11" cy="11" r="4" fill="#05060b"/></svg>' +
+    '<span style="margin-bottom:12px;padding:2px 8px;border-radius:999px;background:#fff;color:#05060b;font:600 12px Sora,system-ui,sans-serif">You</span>'
+  return el
 }
 
 /** Fills its parent. The parent decides where the globe sits and how much of it shows. */
-export default function EclipseGlobe({ type, geometry, altitude, you = null }: EclipseGlobeProps) {
+export default function EclipseGlobe({ type, geometry, altitude, you = null, toPath = null }: EclipseGlobeProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const globeRef = useRef<GlobeMethods>()
   const [size, setSize] = useState({ width: 0, height: 0 })
@@ -50,7 +63,11 @@ export default function EclipseGlobe({ type, geometry, altitude, you = null }: E
 
   const layers = useMemo(() => (geometry ? buildLayers(geometry) : null), [geometry])
   const center = useMemo(() => (geometry ? centerOf(geometry) : null), [geometry])
-  const rings = useMemo(() => (you ? [you] : []), [you])
+  const markers = useMemo(() => (you ? [you] : []), [you])
+  const paths = useMemo(() => {
+    const base: { zone: string; points: Point[] }[] = layers?.paths ?? []
+    return you && toPath ? [...base, { zone: 'toPath', points: [you, toPath] }] : base
+  }, [layers, you, toPath])
 
   // Slow spin while idle; turn off once an eclipse is shown and the camera is aimed at it.
   useEffect(() => {
@@ -116,23 +133,28 @@ export default function EclipseGlobe({ type, geometry, altitude, you = null }: E
           polygonCapColor={() => GLOBE_COLORS.solarFill}
           polygonSideColor={() => 'rgba(0,0,0,0)'}
           polygonAltitude={0.005}
-          pathsData={layers?.paths ?? []}
+          pathsData={paths}
           pathPoints="points"
           pathPointLat={(p: object) => (p as { lat: number }).lat}
           pathPointLng={(p: object) => (p as { lng: number }).lng}
-          pathColor={(p: object) =>
-            (p as { zone: string }).zone === 'centerline' ? GLOBE_COLORS.solarCentre : GLOBE_COLORS.solarLimits
-          }
-          pathStroke={(p: object) => ((p as { zone: string }).zone === 'centerline' ? 0.6 : 1.6)}
+          pathColor={(p: object) => {
+            const zone = (p as { zone: string }).zone
+            return zone === 'toPath' ? GLOBE_COLORS.you : zone === 'centerline' ? GLOBE_COLORS.solarCentre : GLOBE_COLORS.solarLimits
+          }}
+          pathStroke={(p: object) => {
+            const zone = (p as { zone: string }).zone
+            return zone === 'toPath' ? 0.8 : zone === 'centerline' ? 0.6 : 1.6
+          }}
+          // Only the line from the pin to the path is dashed.
+          pathDashLength={(p: object) => ((p as { zone: string }).zone === 'toPath' ? 0.06 : 1)}
+          pathDashGap={(p: object) => ((p as { zone: string }).zone === 'toPath' ? 0.04 : 0)}
           pathPointAlt={0.006}
           // The viewer's position after "Check my location".
-          ringsData={rings}
-          ringLat="lat"
-          ringLng="lng"
-          ringColor={() => (t: number) => `rgba(255, 255, 255, ${1 - t})`}
-          ringMaxRadius={4}
-          ringPropagationSpeed={2}
-          ringRepeatPeriod={1200}
+          htmlElementsData={markers}
+          htmlLat="lat"
+          htmlLng="lng"
+          htmlAltitude={0.01}
+          htmlElement={youMarker}
         />
       )}
     </Box>

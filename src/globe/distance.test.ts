@@ -57,6 +57,9 @@ describe('distanceToLine', () => {
     // Two degrees of longitude at 5°N.
     expect(leg.km).toBeCloseTo(2 * 111.2 * Math.cos((5 * Math.PI) / 180), -1)
     expect(leg.direction).toBe('west')
+    // The nearest point itself, for drawing the line to it.
+    expect(leg.to.lng).toBeCloseTo(10, 5)
+    expect(leg.to.lat).toBeCloseTo(5, 0)
   })
 
   it('handles lines across the antimeridian', () => {
