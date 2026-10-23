@@ -1,7 +1,7 @@
 import { Box, HStack, SimpleGrid, Skeleton, Stack, Text } from '@chakra-ui/react'
 import { keyframes } from '@emotion/react'
 import type { FC, ReactNode } from 'react'
-import { eventProgress, type CountdownTarget, type Remaining } from '../hooks/countdown'
+import { eventProgress, TILES_MAX_MS, type CountdownTarget, type Remaining } from '../hooks/countdown'
 import type { Phase } from '../hooks/timeline'
 import type { EclipseFilter, EclipseSummary } from '../data/types'
 import { formatEndsIn, formatEventTime, formatLongSpan, formatSpan, utcOffsetLabel } from './format'
@@ -43,8 +43,6 @@ export const DigitTile: FC<{ label: string; value: number }> = ({ label, value }
   </Box>
 )
 
-/** Beyond this, a ticking day count is noise (and won't fit), so the countdown becomes a sentence. */
-const TILES_MAX_MS = 365 * 86_400_000
 
 const pulse = keyframes`
   0%, 100% { opacity: 1; }
@@ -69,20 +67,24 @@ const Label: FC<{ children: string; live?: boolean }> = ({ children, live = fals
   </HStack>
 )
 
-/** A sentence in place of the tiles, the same height so the layout doesn't jump. */
-const Statement: FC<{ title: string; muted?: boolean; children?: ReactNode }> = ({ title, muted = false, children }) => (
+/**
+ * A sentence in place of the tiles, in a box of the same height so the layout doesn't jump. Past or far off
+ * (`quiet`) on wide screens it drops the box for a lighter line, leaving room for the next steps; phones
+ * keep the box, which also keeps the text readable over the globe behind it.
+ */
+const Statement: FC<{ title: string; quiet?: boolean; children?: ReactNode }> = ({ title, quiet = false, children }) => (
   <Box
     {...tileStyle}
-    bg={muted ? 'rgba(14, 15, 26, 0.5)' : tileStyle.bg}
-    borderColor={muted ? 'whiteAlpha.100' : tileStyle.borderColor}
-    h={TILE_HEIGHT}
-    px={{ base: 5, lg: 7 }}
+    bg={quiet ? { base: 'rgba(14, 15, 26, 0.82)', lg: 'transparent' } : tileStyle.bg}
+    border={quiet ? { base: '1px solid', lg: 'none' } : tileStyle.border}
+    h={quiet ? { base: TILE_HEIGHT.base, lg: 'auto' } : TILE_HEIGHT}
+    px={quiet ? { base: 5, lg: 0 } : { base: 5, lg: 7 }}
     display="flex"
     flexDir="column"
     justifyContent="center"
     gap={3}
   >
-    <Text fontSize={{ base: '2xl', lg: '4xl' }} fontWeight="semibold" lineHeight="1.1" letterSpacing="-0.02em">
+    <Text fontSize={{ base: '2xl', lg: quiet ? '3xl' : '4xl' }} fontWeight="semibold" lineHeight="1.1" letterSpacing="-0.02em">
       {title}
     </Text>
     {children}
@@ -138,7 +140,7 @@ export const Countdown: FC<CountdownProps> = ({ eclipse, phase, target, remainin
     return (
       <Stack spacing={2.5}>
         <Label>Ended</Label>
-        <Statement muted title={`Happened ${formatSpan(now - Date.parse(eclipse.endUtc))} ago`} />
+        <Statement quiet title={`Happened ${formatSpan(now - Date.parse(eclipse.endUtc))} ago`} />
       </Stack>
     )
   }
@@ -160,7 +162,7 @@ export const Countdown: FC<CountdownProps> = ({ eclipse, phase, target, remainin
     return (
       <Stack spacing={2.5}>
         <Label>{TARGET_LABEL[target.target]}</Label>
-        <Statement muted title={formatLongSpan(untilTarget)} />
+        <Statement quiet title={formatLongSpan(untilTarget)} />
       </Stack>
     )
   }

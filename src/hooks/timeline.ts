@@ -141,3 +141,15 @@ export function timelineStrip(
     toMs,
   }
 }
+
+/** The next eclipse of the same type and kind that hasn't ended, other than `eclipse` itself. */
+export function nextOfKind(list: EclipseSummary[], eclipse: EclipseSummary, nowMs: number): EclipseSummary | undefined {
+  return list.find(
+    (e) => e.id !== eclipse.id && e.type === eclipse.type && e.kind === eclipse.kind && Date.parse(e.endUtc) > nowMs,
+  )
+}
+
+/** The next member of `eclipse`'s Saros series, about 18 years later. */
+export function nextInSaros(list: EclipseSummary[], eclipse: EclipseSummary): EclipseSummary | undefined {
+  return list.find((e) => e.type === eclipse.type && e.saros === eclipse.saros && peakMs(e) > peakMs(eclipse))
+}
