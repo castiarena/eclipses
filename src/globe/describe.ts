@@ -63,30 +63,64 @@ const CENTRAL_NOUN: Partial<Record<EclipseKind, string>> = {
   hybrid: 'the central shadow',
 }
 
+/** Whether the eclipse is ahead, happening, or over; picks the sentence's tense. */
+export type Tense = 'future' | 'present' | 'past'
+
+// Future and present share the simple present ("crosses"); only lunar copy needs "now".
+const COPY = {
+  lunarBase: {
+    future: 'Visible from anywhere the Moon is above the horizon',
+    present: 'Visible now from anywhere the Moon is above the horizon',
+    past: 'Was visible from anywhere the Moon was above the horizon',
+  },
+  fullShow: {
+    future: (plural: boolean) => (plural ? 'get' : 'gets'),
+    present: (plural: boolean) => (plural ? 'are getting' : 'is getting'),
+    past: () => 'got',
+  },
+  partial: {
+    future: 'A partial eclipse: the Moon covers part of the Sun as seen from a wide area. The exact zone is not mapped yet.',
+    present: 'A partial eclipse: the Moon covers part of the Sun as seen from a wide area. The exact zone is not mapped yet.',
+    past: 'A partial eclipse: the Moon covered part of the Sun as seen from a wide area. The exact zone is not mapped.',
+  },
+  nonCentral: {
+    future: "The Moon's central shadow only grazes the Earth near a pole, so no path is mapped; a wider area sees a partial eclipse.",
+    present: "The Moon's central shadow only grazes the Earth near a pole, so no path is mapped; a wider area sees a partial eclipse.",
+    past: "The Moon's central shadow only grazed the Earth near a pole, so no path is mapped; a wider area saw a partial eclipse.",
+  },
+  ocean: {
+    future: (noun: string) => `The path of ${noun} stays over open ocean; nearby coasts see a partial eclipse.`,
+    present: (noun: string) => `The path of ${noun} stays over open ocean; nearby coasts see a partial eclipse.`,
+    past: (noun: string) => `The path of ${noun} stayed over open ocean; nearby coasts saw a partial eclipse.`,
+  },
+  land: {
+    future: (noun: string, list: string) => `The path of ${noun} crosses ${list}; a much wider area sees a partial eclipse.`,
+    present: (noun: string, list: string) => `The path of ${noun} crosses ${list}; a much wider area sees a partial eclipse.`,
+    past: (noun: string, list: string) => `The path of ${noun} crossed ${list}; a much wider area saw a partial eclipse.`,
+  },
+} as const
+
 /** One sentence on where an eclipse can be seen, built from its stored geometry. */
 export function describeVisibility(
   eclipse: { type: EclipseType; kind: EclipseKind },
   geometry: EclipseGeometry | null,
+  tense: Tense = 'future',
 ): string {
   if (eclipse.type === 'lunar') {
-    const base = 'Visible from anywhere the Moon is above the horizon'
+    const base = COPY.lunarBase[tense]
     const regions = geometry?.grid ? lunarFullRegions(geometry.grid) : []
     if (!regions.length) return `${base}.`
     const list = joinRegions(regions)
     // "The Americas" is plural even when it is the only item.
-    const verb = isPlural(regions) || list === 'the Americas' ? 'get' : 'gets'
+    const verb = COPY.fullShow[tense](isPlural(regions) || list === 'the Americas')
     return `${base} — ${list} ${verb} the full show.`
   }
 
   const noun = CENTRAL_NOUN[eclipse.kind]
-  if (!noun) {
-    return 'A partial eclipse: the Moon covers part of the Sun as seen from a wide area. The exact zone is not mapped yet.'
-  }
-  if (!geometry?.features) {
-    // Non-central eclipse: the shadow only grazes a polar edge, so NASA maps no path.
-    return "The Moon's central shadow only grazes the Earth near a pole, so no path is mapped; a wider area sees a partial eclipse."
-  }
+  if (!noun) return COPY.partial[tense]
+  // Non-central eclipse: the shadow only grazes a polar edge, so NASA maps no path.
+  if (!geometry?.features) return COPY.nonCentral[tense]
   const regions = solarPathRegions(geometry)
-  if (!regions.length) return `The path of ${noun} stays over open ocean; nearby coasts see a partial eclipse.`
-  return `The path of ${noun} crosses ${joinRegions(regions)}; a much wider area sees a partial eclipse.`
+  if (!regions.length) return COPY.ocean[tense](noun)
+  return COPY.land[tense](noun, joinRegions(regions))
 }

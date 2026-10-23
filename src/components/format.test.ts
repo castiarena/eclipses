@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
+  formatDateWithoutYear,
   formatDuration,
+  formatEndsIn,
+  formatSpan,
   formatHeadlineDate,
   formatLocalShort,
   formatMagnitude,
@@ -67,5 +70,36 @@ describe('formatMagnitude', () => {
   it('rounds to three decimals', () => {
     expect(formatMagnitude(1.079)).toBe('1.079')
     expect(formatMagnitude(0.9281)).toBe('0.928')
+  })
+})
+
+describe('formatDateWithoutYear', () => {
+  it('writes the long and short forms', () => {
+    expect(formatDateWithoutYear(PEAK, {}, 'UTC')).toBe('Saturday, 6 February')
+    expect(formatDateWithoutYear(PEAK, { short: true }, 'UTC')).toBe('Sat 6 Feb')
+  })
+})
+
+describe('formatSpan', () => {
+  const DAY = 86_400_000
+  it('uses the largest whole unit, singular or plural', () => {
+    expect(formatSpan(73.4 * 365.25 * DAY)).toBe('73 years')
+    expect(formatSpan(366 * DAY)).toBe('1 year')
+    expect(formatSpan(45 * DAY)).toBe('1 month')
+    expect(formatSpan(3 * DAY)).toBe('3 days')
+    expect(formatSpan(5 * 3_600_000)).toBe('5 hours')
+    expect(formatSpan(90_000)).toBe('1 minute')
+    expect(formatSpan(10_000)).toBe('a moment')
+  })
+
+  it('ignores the sign', () => {
+    expect(formatSpan(-3 * DAY)).toBe('3 days')
+  })
+})
+
+describe('formatEndsIn', () => {
+  it('shows hours and minutes, or minutes alone', () => {
+    expect(formatEndsIn({ days: 0, hours: 1, minutes: 12, seconds: 5 })).toBe('1 h 12 min')
+    expect(formatEndsIn({ days: 0, hours: 0, minutes: 12, seconds: 5 })).toBe('12 min')
   })
 })

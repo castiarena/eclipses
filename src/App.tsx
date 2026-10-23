@@ -3,33 +3,37 @@ import { lazy, Suspense, useEffect, useMemo, useState, type FC } from "react"
 import { Brand } from "./components/Brand"
 import { Countdown } from "./components/Countdown"
 import { EclipseDetails } from "./components/EclipseDetails"
-import { EclipseHeadline } from "./components/EclipseHeadline"
+import { BackToNext, EclipseHeadline } from "./components/EclipseHeadline"
 import { EclipseTypeToggle } from "./components/EclipseTypeToggle"
 import { LegendInline, LegendPills } from "./components/Legend"
 import { MobileSheet } from "./components/MobileSheet"
 import { Starfield } from "./components/Starfield"
 import { LocationButton, LocationMessage, useMyLocation } from "./components/YourLocation"
-import { describeVisibility } from "./globe/describe"
-import { useEclipseCountdown } from "./hooks/useEclipseCountdown"
+import { describeVisibility, type Tense } from "./globe/describe"
+import type { Phase } from "./hooks/timeline"
+import { useEclipseBrowser } from "./hooks/useEclipseBrowser"
 import { useEclipseGeometry } from "./hooks/useEclipseGeometry"
-import type { EclipseType } from "./data/types"
+import { useArrowKeys, useSwipe } from "./hooks/useStepInput"
+import type { EclipseFilter } from "./data/types"
 
 // three.js is large, so the globe is split out and loaded on first render.
 const EclipseGlobe = lazy(() => import("./components/EclipseGlobe"))
 
-// The selected type lives in the URL (?type=lunar) so a view can be shared.
-const readTypeFromUrl = (): EclipseType => {
+// The selected filter lives in the URL (?type=lunar) so a view can be shared.
+// The browsed eclipse doesn't: a reload returns to the next one.
+const readFilterFromUrl = (): EclipseFilter => {
     try {
-        return new URLSearchParams(window.location.search).get("type") === "lunar" ? "lunar" : "solar"
+        const type = new URLSearchParams(window.location.search).get("type")
+        return type === "lunar" || type === "all" ? type : "solar"
     } catch {
         return "solar"
     }
 }
 
-const writeTypeToUrl = (type: EclipseType) => {
+const writeFilterToUrl = (filter: EclipseFilter) => {
     try {
         const url = new URL(window.location.href)
-        url.searchParams.set("type", type)
+        url.searchParams.set("type", filter)
         window.history.replaceState(null, "", url)
     } catch {
         // URL state is a convenience; the page works without it.
@@ -38,7 +42,7 @@ const writeTypeToUrl = (type: EclipseType) => {
 
 const Footnote: FC = () => (
     <Text fontSize="sm" lineHeight="1.5" color="whiteAlpha.700" maxW="460px">
-        Times are UTC-based. Data: NASA GSFC eclipse catalogs (Espenak &amp; Meeus).
+        Times are UTC-based; those after 2030 are predictions and may shift by a minute or so. Data: NASA GSFC eclipse catalogs (Espenak &amp; Meeus).
     </Text>
 )
 
@@ -49,24 +53,51 @@ const RotateIcon: FC = () => (
     </svg>
 )
 
-const App = () => {
-    const [type, setType] = useState<EclipseType>(readTypeFromUrl)
-    const { eclipse, remaining, loading } = useEclipseCountdown(type)
-    const geo = useEclipseGeometry(eclipse?.id)
-    const location = useMyLocation(type, geo.geometry)
-    const wide = useBreakpointValue({ base: false, lg: true }, { ssr: false }) ?? false
+const TENSE: Record<Phase, Tense> = { upcoming: "future", now: "present", past: "past" }
 
-    useEffect(() => writeTypeToUrl(type), [type])
+const App = () => {
+    const [filter, setFilter] = useState<EclipseFilter>(readFilterFromUrl)
+    const browser = useEclipseBrowser(filter)
+    const { eclipse, phase, loading } = browser
+    const tense = TENSE[phase ?? "upcoming"]
+    const geo = useEclipseGeometry(eclipse?.id, [browser.previous?.id, browser.following?.id])
+    const location = useMyLocation(eclipse, geo.geometry, tense)
+    const wide = useBreakpointValue({ base: false, lg: true }, { ssr: false }) ?? false
+    const swipe = useSwipe(browser.prev, browser.next)
+    useArrowKeys(browser.prev, browser.next)
+
+    useEffect(() => writeFilterToUrl(filter), [filter])
 
     const description = useMemo(
-        () => (eclipse && !geo.loading ? describeVisibility(eclipse, geo.geometry) : undefined),
-        [eclipse, geo.loading, geo.geometry],
+        () => (eclipse && !geo.loading ? describeVisibility(eclipse, geo.geometry, tense) : undefined),
+        [eclipse, geo.loading, geo.geometry, tense],
     )
 
+    // The globe keeps the last loaded overlay while the next one loads, so its type comes from that overlay.
+    const shown = geo.displayGeometry
     const globe = (altitude: number) => (
         <Suspense fallback={null}>
-            <EclipseGlobe type={type} geometry={geo.geometry} altitude={altitude} you={location.position} />
+            <EclipseGlobe
+                type={shown ? (shown.grid ? "lunar" : "solar") : eclipse?.type ?? "solar"}
+                geometry={shown}
+                altitude={altitude}
+                you={location.position}
+            />
         </Suspense>
+    )
+
+    const toggle = <EclipseTypeToggle value={filter} onChange={setFilter} onReselect={browser.reset} />
+    const countdown = (shortLabels: boolean) => (
+        <Countdown
+            eclipse={eclipse}
+            phase={phase}
+            remaining={browser.remaining}
+            now={browser.now}
+            loading={loading}
+            filter={filter}
+            pinned={!browser.isLive}
+            shortLabels={shortLabels}
+        />
     )
 
     if (wide) {
@@ -90,7 +121,7 @@ const App = () => {
                     {...passThrough}
                 >
                     <Flex justify="space-between" align="flex-start" {...passThrough}>
-                        <Brand />
+                        <Brand onClick={browser.reset} />
                         <Box position="relative">
                             <LocationButton location={location} />
                             <Box position="absolute" top="calc(100% + 12px)" right={0}>
@@ -101,9 +132,12 @@ const App = () => {
 
                     <Flex flex={1} align="center" py={10} {...passThrough}>
                         <Stack spacing={{ lg: 6, "2xl": 7 }} w="560px">
-                            <EclipseTypeToggle value={type} onChange={setType} />
-                            <EclipseHeadline eclipse={eclipse} loading={loading} description={description} longEyebrow />
-                            <Countdown type={type} remaining={remaining} loading={loading} />
+                            <HStack spacing={4}>
+                                {toggle}
+                                {!browser.isLive && <BackToNext onClick={browser.reset} />}
+                            </HStack>
+                            <EclipseHeadline eclipse={eclipse} loading={loading} browse={browser} description={description} longEyebrow />
+                            {countdown(false)}
                             {eclipse && (
                                 <>
                                     <Divider borderColor="whiteAlpha.200" />
@@ -133,13 +167,16 @@ const App = () => {
             <Starfield />
             <Flex position="relative" zIndex={1} direction="column" minH="100dvh" px={5} pt={4} pb={5}>
                 <HStack justify="space-between" mb={5}>
-                    <Brand />
+                    <Brand onClick={browser.reset} />
                     <LocationButton location={location} compact />
                 </HStack>
                 <Stack spacing={5}>
-                    <EclipseTypeToggle value={type} onChange={setType} />
-                    <EclipseHeadline eclipse={eclipse} loading={loading} />
-                    <Countdown type={type} remaining={remaining} loading={loading} shortLabels />
+                    {toggle}
+                    {/* Swipe left or right here to step; the globe and sheet keep their own drags. */}
+                    <Stack spacing={5} {...swipe}>
+                        <EclipseHeadline eclipse={eclipse} loading={loading} browse={browser} compact />
+                        {countdown(true)}
+                    </Stack>
                     <LocationMessage location={location} />
                 </Stack>
 
