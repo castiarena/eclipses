@@ -6,6 +6,10 @@ import { buildLayers, centerOf } from '../globe/layers'
 import { GLOBE_COLORS } from '../globe/palette'
 import type { Point } from '../globe/visibility'
 
+// Camera moves are instant for people who asked for less motion.
+const flightMs = (): number =>
+  typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 1200
+
 const hasWebGL = (): boolean => {
   try {
     const canvas = document.createElement('canvas')
@@ -16,7 +20,9 @@ const hasWebGL = (): boolean => {
 }
 
 interface EclipseGlobeProps {
+  /** Type of the eclipse `geometry` belongs to (it can lag one step behind the headline). */
   type: EclipseType
+  /** Drawn as is; the camera flies to it each time a new one arrives. */
   geometry: EclipseGeometry | null
   /** Camera distance in globe radii; smaller is closer. */
   altitude: number
@@ -56,12 +62,12 @@ export default function EclipseGlobe({ type, geometry, altitude, you = null }: E
 
   useEffect(() => {
     if (!ready || !globeRef.current || !center) return
-    globeRef.current.pointOfView({ lat: center.lat, lng: center.lng, altitude }, 1200)
+    globeRef.current.pointOfView({ lat: center.lat, lng: center.lng, altitude }, flightMs())
   }, [ready, center, altitude])
 
   useEffect(() => {
     if (!ready || !globeRef.current || !you) return
-    globeRef.current.pointOfView({ lat: you.lat, lng: you.lng, altitude }, 1200)
+    globeRef.current.pointOfView({ lat: you.lat, lng: you.lng, altitude }, flightMs())
   }, [ready, you, altitude])
 
   if (!webgl) {

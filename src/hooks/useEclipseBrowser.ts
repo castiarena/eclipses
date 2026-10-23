@@ -18,6 +18,8 @@ export interface EclipseBrowser {
   phase: Phase | undefined
   /** Time until the start while upcoming, until the end while happening, null once past. */
   remaining: Remaining | null
+  /** The clock the phase and remaining time were computed from (ticks every second). */
+  now: number
   /** True when nothing is pinned and the view follows the next eclipse by itself. */
   isLive: boolean
   loading: boolean
@@ -99,6 +101,7 @@ export function useEclipseBrowser(
     eclipse,
     phase,
     remaining,
+    now,
     isLive: pinnedId === null,
     loading: all === null,
     previous,

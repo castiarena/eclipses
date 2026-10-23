@@ -18,11 +18,20 @@ const EclipseMark: FC<{ size: number }> = ({ size }) => (
   </svg>
 )
 
-export const Brand: FC = () => (
-  <HStack spacing={3}>
-    <EclipseMark size={28} />
-    <Text as="h1" fontSize="lg" fontWeight="semibold" letterSpacing="-0.01em">
-      Next eclipse
-    </Text>
-  </HStack>
+/** The site name. Clicking it goes back to the next eclipse. */
+export const Brand: FC<{ onClick?: () => void }> = ({ onClick }) => (
+  <Text as="h1" fontSize="lg" fontWeight="semibold" letterSpacing="-0.01em">
+    <HStack
+      as="button"
+      type="button"
+      spacing={3}
+      onClick={onClick}
+      title="Back to the next eclipse"
+      borderRadius="md"
+      _focusVisible={{ outline: '2px solid', outlineColor: 'accent.300', outlineOffset: '4px' }}
+    >
+      <EclipseMark size={28} />
+      <span>Next eclipse</span>
+    </HStack>
+  </Text>
 )

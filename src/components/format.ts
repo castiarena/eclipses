@@ -1,9 +1,12 @@
-import type { EclipseKind, EclipseType } from '../data/types'
+import type { EclipseFilter, EclipseKind, EclipseType } from '../data/types'
+import type { Remaining } from '../hooks/countdown'
 
 export const TYPE_LABEL: Record<EclipseType, string> = {
   solar: 'Solar',
   lunar: 'Lunar',
 }
+
+export const FILTER_LABEL: Record<EclipseFilter, string> = { ...TYPE_LABEL, all: 'All' }
 
 export const KIND_LABEL: Record<EclipseKind, string> = {
   total: 'Total',
@@ -44,6 +47,12 @@ export function formatHeadlineDate(iso: string, timeZone?: string): string {
   return `${p.weekday}, ${p.day} ${p.month} ${p.year}`
 }
 
+/** Headline date without the year, which the headline renders as a picker. "Saturday, 6 February" or "Sat 6 Feb". */
+export function formatDateWithoutYear(iso: string, { short = false } = {}, timeZone?: string): string {
+  const p = dateParts(iso, { weekday: short ? 'short' : 'long', day: 'numeric', month: short ? 'short' : 'long' }, timeZone)
+  return short ? `${p.weekday} ${p.day} ${p.month}` : `${p.weekday}, ${p.day} ${p.month}`
+}
+
 /** Local date and 24h time, e.g. "6 Feb 2027 · 12:59", or "6 Feb · 12:59" without the year. */
 export function formatLocalShort(iso: string, { withYear = true } = {}, timeZone?: string): string {
   const p = dateParts(
@@ -70,6 +79,29 @@ export function formatDuration(seconds: number | null): string | null {
   const m = Math.floor(seconds / 60)
   const s = seconds % 60
   return `${m}m ${String(s).padStart(2, '0')}s`
+}
+
+const SPAN_UNITS: [name: string, ms: number][] = [
+  ['year', 365.25 * 86_400_000],
+  ['month', 30.44 * 86_400_000],
+  ['day', 86_400_000],
+  ['hour', 3_600_000],
+  ['minute', 60_000],
+]
+
+/** A time span in its largest whole unit: "73 years", "1 month", "5 hours". Under a minute is "a moment". */
+export function formatSpan(ms: number): string {
+  for (const [name, size] of SPAN_UNITS) {
+    const n = Math.floor(Math.abs(ms) / size)
+    if (n >= 1) return `${n} ${name}${n === 1 ? '' : 's'}`
+  }
+  return 'a moment'
+}
+
+/** Time left in a happening eclipse: "1 h 12 min", or "12 min" under an hour. */
+export function formatEndsIn({ days, hours, minutes }: Remaining): string {
+  const h = days * 24 + hours
+  return h > 0 ? `${h} h ${minutes} min` : `${minutes} min`
 }
 
 export function formatMagnitude(value: number): string {

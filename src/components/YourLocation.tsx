@@ -1,6 +1,7 @@
 import { Box, Button, IconButton, Text } from '@chakra-ui/react'
 import { useMemo, useState, type FC } from 'react'
-import type { EclipseGeometry, EclipseType } from '../data/types'
+import type { EclipseGeometry, EclipseSummary, EclipseType } from '../data/types'
+import type { Tense } from '../globe/describe'
 import { visibilityAt, type Point, type Visibility } from '../globe/visibility'
 
 type Status =
@@ -9,21 +10,62 @@ type Status =
   | { kind: 'error'; message: string }
   | { kind: 'done'; position: Point }
 
-const MESSAGES: Record<EclipseType, Record<Visibility, string>> = {
-  solar: {
-    central: 'Your location is in the path of totality or annularity.',
-    full: '',
-    partial: '',
-    none: 'Outside the mapped path. A partial view may still be possible; partial zones are not mapped yet.',
-    unknown: 'The map cannot tell for this location.',
+const UNKNOWN = 'The map cannot tell for this location.'
+
+const MESSAGES: Record<Tense, Record<EclipseType, Record<Visibility, string>>> = {
+  future: {
+    solar: {
+      central: 'Your location is in the path of totality or annularity.',
+      full: '',
+      partial: '',
+      none: 'Outside the mapped path. A partial view may still be possible; partial zones are not mapped yet.',
+      unknown: UNKNOWN,
+    },
+    lunar: {
+      central: '',
+      full: 'The Moon is up for the whole eclipse from your location.',
+      partial: 'The Moon is up for part of the eclipse from your location.',
+      none: 'The Moon is below the horizon from your location.',
+      unknown: UNKNOWN,
+    },
   },
-  lunar: {
-    central: '',
-    full: 'The Moon is up for the whole eclipse from your location.',
-    partial: 'The Moon is up for part of the eclipse from your location.',
-    none: 'The Moon is below the horizon from your location.',
-    unknown: 'The map cannot tell for this location.',
+  present: {
+    solar: {
+      central: 'Your location is in the path of totality or annularity, and it is happening now.',
+      full: '',
+      partial: '',
+      none: 'Outside the mapped path. You may still see a partial eclipse now; partial zones are not mapped yet.',
+      unknown: UNKNOWN,
+    },
+    lunar: {
+      central: '',
+      full: 'The Moon is up for the whole eclipse from your location. Look up now.',
+      partial: 'The Moon is up for part of the eclipse from your location.',
+      none: 'The Moon is below the horizon from your location.',
+      unknown: UNKNOWN,
+    },
   },
+  past: {
+    solar: {
+      central: 'Your location was in the path of totality or annularity.',
+      full: '',
+      partial: '',
+      none: 'Outside the mapped path. A partial view may have been possible; partial zones are not mapped.',
+      unknown: UNKNOWN,
+    },
+    lunar: {
+      central: '',
+      full: 'The Moon was up for the whole eclipse from your location.',
+      partial: 'The Moon was up for part of the eclipse from your location.',
+      none: 'The Moon was below the horizon from your location.',
+      unknown: UNKNOWN,
+    },
+  },
+}
+
+/** What to tell the viewer about one spot, or null for nothing to say. */
+export function locationMessage(type: EclipseType, visibility: Visibility, tense: Tense): string | null {
+  return MESSAGES[tense][type][visibility] || null
 }
 
 export interface MyLocation {
@@ -37,9 +79,14 @@ export interface MyLocation {
 
 /**
  * Opt-in geolocation. The position is kept, so the answer follows the
- * selected eclipse when the viewer switches between solar and lunar.
+ * shown eclipse as the viewer switches type or steps through time.
+ * `geometry` must belong to `eclipse`; while it loads there is no answer yet.
  */
-export function useMyLocation(type: EclipseType, geometry: EclipseGeometry | null): MyLocation {
+export function useMyLocation(
+  eclipse: EclipseSummary | undefined,
+  geometry: EclipseGeometry | null,
+  tense: Tense,
+): MyLocation {
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
 
   const check = () => {
@@ -58,10 +105,11 @@ export function useMyLocation(type: EclipseType, geometry: EclipseGeometry | nul
   const position = status.kind === 'done' ? status.position : null
   const message = useMemo(() => {
     if (status.kind === 'error') return status.message
-    if (!position) return null
-    if (!geometry) return 'There is no visibility map for this eclipse yet.'
-    return MESSAGES[type][visibilityAt(geometry, position)]
-  }, [status, position, geometry, type])
+    if (!position || !eclipse) return null
+    if (!eclipse.hasGeometry) return 'There is no visibility map for this eclipse.'
+    if (!geometry) return null
+    return locationMessage(eclipse.type, visibilityAt(geometry, position), tense)
+  }, [status, position, eclipse, geometry, tense])
 
   return { locating: status.kind === 'locating', position, message, check }
 }

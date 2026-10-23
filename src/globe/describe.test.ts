@@ -41,11 +41,34 @@ describe('describeVisibility', () => {
     expect(text).toMatch(/^The path of totality crosses Africa and Asia;/)
   })
 
-  it('describes every eclipse in the catalog without throwing', async () => {
-    const all = [...(await repo.getUpcoming('solar', 0)), ...(await repo.getUpcoming('lunar', 0))]
-    for (const e of all) {
+  it('describes every eclipse in the catalog, in every tense, without throwing', async () => {
+    for (const e of await repo.getAll()) {
       const geometry = e.hasGeometry ? await repo.getGeometry(e.id) : null
-      expect(describeVisibility(e, geometry)).toMatch(/\.$/)
+      for (const tense of ['future', 'present', 'past'] as const) {
+        expect(describeVisibility(e, geometry, tense)).toMatch(/\.$/)
+      }
     }
+  })
+
+  it('switches tense for lunar eclipses', () => {
+    const grid = lunarGrid(110, 156)
+    expect(describeVisibility({ type: 'lunar', kind: 'total' }, grid, 'present')).toBe(
+      'Visible now from anywhere the Moon is above the horizon — Australia is getting the full show.',
+    )
+    expect(describeVisibility({ type: 'lunar', kind: 'total' }, grid, 'past')).toBe(
+      'Was visible from anywhere the Moon was above the horizon — Australia got the full show.',
+    )
+    expect(describeVisibility({ type: 'lunar', kind: 'total' }, lunarGrid(-170, -30), 'present')).toMatch(
+      /the Americas are getting the full show\.$/,
+    )
+  })
+
+  it('switches tense for solar eclipses', async () => {
+    const geometry = await repo.getGeometry('2027-08-02-solar')
+    expect(describeVisibility({ type: 'solar', kind: 'total' }, geometry, 'past')).toMatch(
+      /^The path of totality crossed Africa and Asia; a much wider area saw a partial eclipse\.$/,
+    )
+    expect(describeVisibility({ type: 'solar', kind: 'partial' }, null, 'past')).toMatch(/covered part of the Sun/)
+    expect(describeVisibility({ type: 'solar', kind: 'total' }, null, 'past')).toMatch(/only grazed the Earth/)
   })
 })

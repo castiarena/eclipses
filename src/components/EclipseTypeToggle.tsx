@@ -1,22 +1,24 @@
 import { Box, Button } from '@chakra-ui/react'
 import type { FC } from 'react'
-import type { EclipseType } from '../data/types'
-import { TYPE_LABEL } from './format'
+import type { EclipseFilter } from '../data/types'
+import { FILTER_LABEL } from './format'
 
-const TYPES: EclipseType[] = ['solar', 'lunar']
+const FILTERS: EclipseFilter[] = ['solar', 'lunar', 'all']
 
 interface EclipseTypeToggleProps {
-  value: EclipseType
-  onChange: (type: EclipseType) => void
+  value: EclipseFilter
+  onChange: (filter: EclipseFilter) => void
+  /** Tapping the option that's already selected; used to go back to the next eclipse. */
+  onReselect?: () => void
 }
 
 /** Pill-shaped segmented control. */
-export const EclipseTypeToggle: FC<EclipseTypeToggleProps> = ({ value, onChange }) => (
+export const EclipseTypeToggle: FC<EclipseTypeToggleProps> = ({ value, onChange, onReselect }) => (
   <Box
     role="group"
     aria-label="Eclipse type"
     display="flex"
-    w={{ base: 'full', lg: '330px' }}
+    w={{ base: 'full', lg: '360px' }}
     p={1}
     gap={1}
     bg="space.800"
@@ -24,11 +26,11 @@ export const EclipseTypeToggle: FC<EclipseTypeToggleProps> = ({ value, onChange 
     borderColor="whiteAlpha.200"
     borderRadius="full"
   >
-    {TYPES.map((type) => {
-      const selected = type === value
+    {FILTERS.map((filter) => {
+      const selected = filter === value
       return (
         <Button
-          key={type}
+          key={filter}
           flex={1}
           h={{ base: '44px', lg: '46px' }}
           borderRadius="full"
@@ -39,9 +41,9 @@ export const EclipseTypeToggle: FC<EclipseTypeToggleProps> = ({ value, onChange 
           _hover={{ bg: selected ? 'accent.600' : 'whiteAlpha.100' }}
           _active={{ bg: selected ? 'accent.600' : 'whiteAlpha.200' }}
           aria-pressed={selected}
-          onClick={() => onChange(type)}
+          onClick={() => (selected ? onReselect?.() : onChange(filter))}
         >
-          {TYPE_LABEL[type]}
+          {FILTER_LABEL[filter]}
         </Button>
       )
     })}
