@@ -3,6 +3,7 @@ import {
   formatDateWithoutYear,
   formatDuration,
   formatEndsIn,
+  formatShortDate,
   formatSpan,
   formatHeadlineDate,
   formatLocalShort,
@@ -76,8 +77,16 @@ describe('formatMagnitude', () => {
 
 describe('formatDateWithoutYear', () => {
   it('writes the long and short forms', () => {
-    expect(formatDateWithoutYear(PEAK, {}, 'UTC')).toBe('Saturday, 6 February')
+    expect(formatDateWithoutYear(PEAK, {}, 'UTC')).toBe('6 February')
     expect(formatDateWithoutYear(PEAK, { short: true }, 'UTC')).toBe('6 Feb')
+  })
+})
+
+describe('formatShortDate', () => {
+  it('writes the day, short month and year, for the arrow targets', () => {
+    expect(formatShortDate(PEAK, 'UTC')).toBe('6 Feb 2027')
+    // The local date, not the UTC one.
+    expect(formatShortDate('2027-02-20T23:12:50Z', 'Asia/Tokyo')).toBe('21 Feb 2027')
   })
 })
 
