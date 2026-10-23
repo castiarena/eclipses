@@ -1,6 +1,6 @@
 # SPEC — UI review and design brief
 
-**Status:** design agreed (see "Design decisions"); not built yet. The build plan is at the end.
+**Status:** brief and decisions in castiarena/eclipses#7. Built in #8 (quick fixes), #9 (headline and nav row), #10 (countdown target), #11 (timeline strip), #12 (mobile sheet), #13 (location logic), #14 (location card), #15 (lunar zones) and #16 (next steps). Departures from this spec are listed at the end.
 
 ## Context
 Browsing through time shipped in #4–#6. This is a review of the live site (https://castiarena.github.io/eclipses/, commit `839a485`) to decide what the next design pass should change.
@@ -243,3 +243,55 @@ Small PRs, each green before merging. Every piece of logic goes in a pure functi
 
 ## Out of scope
 New eclipse data (partial-solar zones, local contact times), accounts or notifications, light mode.
+
+## Changes during implementation
+
+### Order
+- **PR 7 (mobile sheet) was built before PRs 5 and 6.** Each of PRs 1–4 made the mobile headline taller, so the globe window kept shrinking; the sheet's peek gave that room back first.
+
+| Build PR | Merged as |
+|---|---|
+| 1 Quick fixes | #8 |
+| 2 Headline and nav row | #9 |
+| 3 Countdown target and event line | #10 |
+| 4 Timeline strip | #11 |
+| 7 Mobile sheet and globe window | #12 |
+| 5 Location logic | #13 |
+| 6 Location answer UI | #14 |
+| 8 Lunar shaded regions | #15 |
+| 9 Past and far-future next steps | #16 |
+
+### Location answer
+- **No moonrise line yet.** Lunar answers show the verdict and the "Moon up start to end / for part of it / below your horizon" title only. Choosing an ephemeris (`astronomy-engine` or a compact formula) is still open.
+- **"Partial only" and "not visible" became one solar verdict, "far from the path".** Without partial-zone data the app can't tell them apart. The card gives the distance and direction, and says a partial eclipse "may still be visible".
+- **Distances are great-circle**, point to segment, against the path's edge and centre line. A flat-map version drifted at continental distances. From Buenos Aires, the 6 Feb 2027 path is 181 km south-east.
+- **No connector line from the desktop card to the pin.** The pin is drawn inside the globe and the card outside it. Instead, a dashed line runs from the pin to the nearest point of the path when you're near it. At the default zoom it is only a few pixels long.
+
+### Countdown and headline
+- **Past label is "Ended"**, and the far-off sentence drops "In" ("17 years, 10 months").
+- **The past and far-off sentence loses its box on desktop only.** Phones keep the box, so the text stays readable over the globe behind it and stays in the same slot.
+- **Details are one row of three facts:** universal time (time only, since the date is in the headline), magnitude, and duration or Saros. Your local time moved into the event line.
+- **Desktop content padding went from 40 to 24 px** so 1440×900 still fits with the event line.
+- **Desktop keeps the "Back to next eclipse" pill** beside the type toggle. The "Past ↩ Now" chip button is phones only.
+
+### Mobile
+- **The peek's key fact is the central duration only.** Lunar peeks have none, so their two-item legend stays on one line.
+- **Once location is checked, the answer card replaces the peek.** The legend and times move into the open sheet.
+- **At least 140 px of the globe always shows above the peek.** On short phones (375×667) the page scrolls a little instead.
+- **The globe reaches up behind the countdown tiles.** The tiles' 82% background keeps them readable.
+
+### Lunar map
+- **The zones are painted onto one texture, not drawn as polygons.** Translucent row rectangles overlapped at their seams and showed as stripes. One equirectangular canvas draped over the globe as a single tile has no seams and can carry real hatching. "Whole" is a solid tint and "part" is a fainter tint with diagonal hatching. There's no outline on the whole zone, and edges follow the 3° grid in steps.
+- **Legend:** "Moon up the whole time" (solid swatch) and "For part of it" (hatched swatch).
+- **`three` is imported directly** for the texture. `src/three.d.ts` declares it untyped, because `@types/three` needs TypeScript 5 and the repo is on 4.9.
+
+### Timeline and next steps
+- **The timeline strip is hidden from screen readers.** The arrows' labels and the status chip carry the same information. It redraws once a minute, not every second.
+- **Next steps stay within the current filter's type.** The Saros step follows the series, so it can point to a partial eclipse.
+
+### Known issues
+- A thin dark arc near the globe's edge on some lunar eclipses (seen on 6 Jul 2028), possibly the texture's seam at ±180°. Not yet explained.
+- Not checked: how the "You" pin behaves when the globe is rotated so the viewer is on the far side.
+
+### Not built yet
+From "Proposed order", step 3: F6 (loading placeholder and smaller texture), F8 (camera choreography), F15 (short-height layout) and the F16 decade grid. The year chevron from F16 shipped in #9.
