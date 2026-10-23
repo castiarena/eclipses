@@ -151,7 +151,20 @@ const App = () => {
                         <Footnote />
                         <HStack spacing={3} flexShrink={0}>
                             {eclipse && <LegendPills eclipse={eclipse} />}
-                            <HStack spacing={2} pl={2} color="whiteAlpha.600" fontFamily="mono" fontSize="xs">
+                            {/* Same glass as the legend, so it stays readable over the globe's overlays. */}
+                            <HStack
+                                spacing={2}
+                                px={4}
+                                h="36px"
+                                bg="rgba(10, 11, 20, 0.6)"
+                                backdropFilter="blur(10px)"
+                                border="1px solid"
+                                borderColor="whiteAlpha.200"
+                                borderRadius="full"
+                                color="whiteAlpha.800"
+                                fontFamily="mono"
+                                fontSize="xs"
+                            >
                                 <RotateIcon />
                                 <Text>Drag to rotate · Scroll to zoom</Text>
                             </HStack>
@@ -163,7 +176,9 @@ const App = () => {
     }
 
     return (
-        <Box position="relative" minH="100dvh" overflow="hidden">
+        // `clip`, not `hidden`: a hidden box is still a scroll container, so focusing a control could scroll it
+        // with no way back. Clipped, it can't scroll; when content is taller than the screen, the page scrolls.
+        <Box position="relative" minH="100dvh" overflow="clip">
             <Starfield />
             <Flex position="relative" zIndex={1} direction="column" minH="100dvh" px={5} pt={4} pb={5}>
                 <HStack justify="space-between" mb={5}>
@@ -174,7 +189,7 @@ const App = () => {
                     {toggle}
                     {/* Swipe left or right here to step; the globe and sheet keep their own drags. */}
                     <Stack spacing={5} {...swipe}>
-                        <EclipseHeadline eclipse={eclipse} loading={loading} browse={browser} compact />
+                        <EclipseHeadline eclipse={eclipse} loading={loading} browse={browser} description={description} compact />
                         {countdown(true)}
                     </Stack>
                     <LocationMessage location={location} />

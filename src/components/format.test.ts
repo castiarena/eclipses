@@ -9,6 +9,7 @@ import {
   formatMagnitude,
   formatUtc,
   formatUtcTime,
+  formatWeekday,
   utcOffsetLabel,
 } from './format'
 
@@ -76,7 +77,15 @@ describe('formatMagnitude', () => {
 describe('formatDateWithoutYear', () => {
   it('writes the long and short forms', () => {
     expect(formatDateWithoutYear(PEAK, {}, 'UTC')).toBe('Saturday, 6 February')
-    expect(formatDateWithoutYear(PEAK, { short: true }, 'UTC')).toBe('Sat 6 Feb')
+    expect(formatDateWithoutYear(PEAK, { short: true }, 'UTC')).toBe('6 Feb')
+  })
+})
+
+describe('formatWeekday', () => {
+  it('writes the full weekday in the viewer time zone', () => {
+    expect(formatWeekday(PEAK, 'UTC')).toBe('Saturday')
+    // 23:12 UTC on a Saturday is already Sunday east of UTC+1.
+    expect(formatWeekday('2027-02-20T23:12:50Z', 'Asia/Tokyo')).toBe('Sunday')
   })
 })
 

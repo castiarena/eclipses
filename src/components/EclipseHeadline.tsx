@@ -4,7 +4,7 @@ import type { EclipseSummary } from '../data/types'
 import { GLOBE_COLORS } from '../globe/palette'
 import { localYear } from '../hooks/timeline'
 import type { EclipseBrowser } from '../hooks/useEclipseBrowser'
-import { KIND_LABEL, TYPE_LABEL, formatDateWithoutYear, formatHeadlineDate } from './format'
+import { KIND_LABEL, TYPE_LABEL, formatDateWithoutYear, formatHeadlineDate, formatWeekday } from './format'
 
 type Browse = Pick<EclipseBrowser, 'previous' | 'following' | 'prev' | 'next' | 'years' | 'jumpToYear' | 'isLive' | 'reset'>
 
@@ -12,11 +12,11 @@ interface EclipseHeadlineProps {
   eclipse: EclipseSummary | undefined
   loading: boolean
   browse: Browse
-  /** Shown under the date on wide screens. */
+  /** Shown under the date; clamped to two lines on compact headlines. */
   description?: string
   /** "Penumbral lunar eclipse" instead of "Penumbral lunar". */
   longEyebrow?: boolean
-  /** Narrow screens: short date ("Sat 6 Feb") so the arrows fit on one line, and the "Back to next" pill above the eyebrow. */
+  /** Narrow screens: the weekday on its own line over a short date ("6 Feb 2027") that never wraps, and the "Back to next" pill above the eyebrow. */
   compact?: boolean
 }
 
@@ -164,14 +164,30 @@ export const EclipseHeadline: FC<EclipseHeadlineProps> = ({
           lineHeight="1.1"
           letterSpacing="-0.02em"
           textAlign={compact ? 'center' : undefined}
+          whiteSpace={compact ? 'nowrap' : undefined}
         >
+          {compact && (
+            <Text as="span" display="block" fontSize="sm" fontWeight="medium" letterSpacing="normal" color="whiteAlpha.700" mb={1}>
+              {formatWeekday(eclipse.peakUtc)}
+            </Text>
+          )}
           {formatDateWithoutYear(eclipse.peakUtc, { short: compact })}{' '}
           <YearPicker year={localYear(eclipse.peakUtc)} years={browse.years} onChange={browse.jumpToYear} />
         </Text>
         <StepButton dir="right" target={browse.following} onClick={browse.next} />
       </HStack>
-      {description && (
-        <Text fontSize="lg" lineHeight="1.55" color="whiteAlpha.800" maxW="460px" pt={2}>
+      {/* Compact headlines reserve two lines (plus the top padding) while the description loads, so nothing below moves. */}
+      {(description || compact) && (
+        <Text
+          minH={compact ? '3.2em' : undefined}
+          fontSize={compact ? 'sm' : 'lg'}
+          lineHeight={compact ? '1.45' : '1.55'}
+          color="whiteAlpha.800"
+          maxW="460px"
+          pt={compact ? 1 : 2}
+          textAlign={compact ? 'center' : undefined}
+          noOfLines={compact ? 2 : undefined}
+        >
           {description}
         </Text>
       )}
