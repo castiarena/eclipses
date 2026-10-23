@@ -38,6 +38,8 @@ export function bearingLabel(degrees: number): Compass {
 export interface Leg {
   km: number
   direction: Compass
+  /** The nearest point itself. */
+  to: Point
 }
 
 /** The point `distance` radians along a great circle from `from`, starting on `heading` degrees. */
@@ -78,7 +80,7 @@ export function distanceToLine(point: Point, coords: number[][]): Leg {
       best = nearest
     }
   }
-  return { km: bestKm, direction: best ? bearingLabel(bearing(point, best)) : 'north' }
+  return best ? { km: bestKm, direction: bearingLabel(bearing(point, best)), to: best } : { km: 0, direction: 'north', to: point }
 }
 
 export type LocationVerdict =
