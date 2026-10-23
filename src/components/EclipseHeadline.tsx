@@ -6,8 +6,9 @@ import { localYear } from '../hooks/timeline'
 import type { EclipseBrowser } from '../hooks/useEclipseBrowser'
 import { KIND_LABEL, TYPE_LABEL, formatDateWithoutYear, formatHeadlineDate, formatShortDate, formatWeekday } from './format'
 import { StatusChip } from './StatusChip'
+import { TimelineStrip } from './TimelineStrip'
 
-type Browse = Pick<EclipseBrowser, 'previous' | 'following' | 'prev' | 'next' | 'years' | 'jumpToYear' | 'isLive' | 'reset' | 'phase'>
+type Browse = Pick<EclipseBrowser, 'previous' | 'following' | 'prev' | 'next' | 'years' | 'jumpToYear' | 'isLive' | 'reset' | 'phase' | 'list' | 'index' | 'now'>
 
 interface EclipseHeadlineProps {
   eclipse: EclipseSummary | undefined
@@ -218,8 +219,11 @@ export const EclipseHeadline: FC<EclipseHeadlineProps> = ({
             </Text>
             {date}
           </Text>
-          <HStack as="nav" aria-label="Browse eclipses" justify="space-between" pt={1}>
+          <HStack as="nav" aria-label="Browse eclipses" spacing={3} pt={1}>
             <StepPill dir="left" target={browse.previous} onClick={browse.prev} />
+            <Box flex={1} minW={0}>
+              <TimelineStrip list={browse.list} index={browse.index} now={browse.now} />
+            </Box>
             <StepPill dir="right" target={browse.following} onClick={browse.next} />
           </HStack>
         </>
@@ -239,6 +243,12 @@ export const EclipseHeadline: FC<EclipseHeadlineProps> = ({
         >
           {description}
         </Text>
+      )}
+      {/* Bottom padding keeps room for the "Now · … back" label the strip may draw under itself. */}
+      {compact && (
+        <Box pt={1} pb={3}>
+          <TimelineStrip list={browse.list} index={browse.index} now={browse.now} compact />
+        </Box>
       )}
     </Stack>
   )

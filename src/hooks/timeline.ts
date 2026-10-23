@@ -1,4 +1,4 @@
-import type { EclipseFilter, EclipseSummary } from '../data/types'
+import type { EclipseFilter, EclipseSummary, EclipseType } from '../data/types'
 
 /** Where an eclipse sits relative to now: before its start, during it, or after its end. */
 export type Phase = 'upcoming' | 'now' | 'past'
@@ -84,4 +84,60 @@ export function retarget(
   const pinned = all.find((e) => e.id === pinnedId)
   if (!pinned) return null
   return next[nearestIndex(next, peakMs(pinned))]?.id ?? null
+}
+
+/** The timeline strip shows this much either side of the selected eclipse: about 18 months. */
+export const STRIP_HALF_SPAN_MS = 18 * 30.44 * 86_400_000
+
+export interface TimelineStrip {
+  /** Eclipses inside the window; `x` runs 0 → 1 from its start to its end. */
+  dots: { id: string; type: EclipseType; x: number; selected: boolean }[]
+  /** Now inside the window, or the edge it lies beyond and how far it is from the selection. */
+  now: { x: number } | { edge: 'start' | 'end'; distanceMs: number }
+  /** The stretch between now and the selected eclipse, cut to the window. */
+  span: { from: number; to: number }
+  /** Where the catalog's first or last eclipse sits, when it's inside the window. */
+  catalogStart: number | null
+  catalogEnd: number | null
+  /** The window itself, for the year labels. */
+  fromMs: number
+  toMs: number
+}
+
+/** What the timeline strip draws around the eclipse at `index`. Null without a selection. */
+export function timelineStrip(
+  list: EclipseSummary[],
+  index: number,
+  nowMs: number,
+  halfSpanMs = STRIP_HALF_SPAN_MS,
+): TimelineStrip | null {
+  const selected = list[index]
+  if (!selected) return null
+  const centre = peakMs(selected)
+  const fromMs = centre - halfSpanMs
+  const toMs = centre + halfSpanMs
+  const xOf = (ms: number) => (ms - fromMs) / (toMs - fromMs)
+  const inside = (ms: number) => ms >= fromMs && ms <= toMs
+
+  const dots = list
+    .filter((e) => inside(peakMs(e)))
+    .map((e) => ({ id: e.id, type: e.type, x: xOf(peakMs(e)), selected: e.id === selected.id }))
+
+  const now: TimelineStrip['now'] = inside(nowMs)
+    ? { x: xOf(nowMs) }
+    : { edge: nowMs < fromMs ? 'start' : 'end', distanceMs: Math.abs(centre - nowMs) }
+  const nowX = 'x' in now ? now.x : now.edge === 'start' ? 0 : 1
+
+  const first = peakMs(list[0])
+  const last = peakMs(list[list.length - 1])
+
+  return {
+    dots,
+    now,
+    span: { from: Math.min(nowX, 0.5), to: Math.max(nowX, 0.5) },
+    catalogStart: inside(first) ? xOf(first) : null,
+    catalogEnd: inside(last) ? xOf(last) : null,
+    fromMs,
+    toMs,
+  }
 }
