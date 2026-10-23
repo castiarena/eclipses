@@ -2,6 +2,9 @@ import type { PackedGrid } from './grid'
 
 export type EclipseType = 'solar' | 'lunar'
 
+/** What the toggle shows: one type, or both interleaved by time. */
+export type EclipseFilter = EclipseType | 'all'
+
 export type EclipseKind = 'total' | 'annular' | 'hybrid' | 'partial' | 'penumbral'
 
 export interface EclipseSummary {
