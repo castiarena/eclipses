@@ -6,6 +6,7 @@ import { EclipseDetails } from "./components/EclipseDetails"
 import { BackToNext, EclipseHeadline } from "./components/EclipseHeadline"
 import { EclipseTypeToggle } from "./components/EclipseTypeToggle"
 import { LegendInline, LegendPills } from "./components/Legend"
+import { ShareMenu } from "./components/ShareMenu"
 import { MobileSheet } from "./components/MobileSheet"
 import { NextSteps, nextSteps } from "./components/NextSteps"
 import { formatDuration } from "./components/format"
@@ -17,14 +18,26 @@ import { useEclipseBrowser } from "./hooks/useEclipseBrowser"
 import { useEclipseGeometry } from "./hooks/useEclipseGeometry"
 import { useArrowKeys, useSwipe } from "./hooks/useStepInput"
 import type { EclipseFilter } from "./data/types"
+import { appBase, eclipsePath, parseEclipseId, typeOfId } from "./share/url"
 
 // three.js is large, so the globe is split out and loaded on first render.
 const EclipseGlobe = lazy(() => import("./components/EclipseGlobe"))
 
-// The selected filter lives in the URL (?type=lunar) so a view can be shared.
-// The browsed eclipse doesn't: a reload returns to the next one.
+// The URL carries the view so it can be shared: ?type=lunar for the filter, and /e/<id>/ for a browsed eclipse.
+// With no eclipse in the path, a reload returns to the next one.
+const readEclipseIdFromUrl = (): string | null => {
+    try {
+        return parseEclipseId(window.location.pathname, appBase())
+    } catch {
+        return null
+    }
+}
+
 const readFilterFromUrl = (): EclipseFilter => {
     try {
+        // A shared eclipse shows under its own type, whatever ?type= says.
+        const id = readEclipseIdFromUrl()
+        if (id) return typeOfId(id)
         const type = new URLSearchParams(window.location.search).get("type")
         return type === "lunar" || type === "all" ? type : "solar"
     } catch {
@@ -32,9 +45,10 @@ const readFilterFromUrl = (): EclipseFilter => {
     }
 }
 
-const writeFilterToUrl = (filter: EclipseFilter) => {
+const writeViewToUrl = (filter: EclipseFilter, eclipseId: string | null) => {
     try {
         const url = new URL(window.location.href)
+        url.pathname = eclipseId ? eclipsePath(eclipseId, appBase()) : appBase()
         url.searchParams.set("type", filter)
         window.history.replaceState(null, "", url)
     } catch {
@@ -59,7 +73,8 @@ const TENSE: Record<Phase, Tense> = { upcoming: "future", now: "present", past: 
 
 const App = () => {
     const [filter, setFilter] = useState<EclipseFilter>(readFilterFromUrl)
-    const browser = useEclipseBrowser(filter)
+    const [sharedId] = useState(readEclipseIdFromUrl)
+    const browser = useEclipseBrowser(filter, undefined, sharedId)
     const { eclipse, phase, loading } = browser
     const tense = TENSE[phase ?? "upcoming"]
     const geo = useEclipseGeometry(eclipse?.id, [browser.previous?.id, browser.following?.id])
@@ -68,7 +83,11 @@ const App = () => {
     const swipe = useSwipe(browser.prev, browser.next)
     useArrowKeys(browser.prev, browser.next)
 
-    useEffect(() => writeFilterToUrl(filter), [filter])
+    // Once the data is in, the address names the pinned eclipse; live views and unknown ids go back to the plain page.
+    const pinnedId = !loading && eclipse && !browser.isLive ? eclipse.id : null
+    useEffect(() => {
+        if (!loading) writeViewToUrl(filter, pinnedId)
+    }, [loading, filter, pinnedId])
 
     // Mobile: the sheet opens up to just under the date row, and the globe keeps its subject above the peek.
     const dateRowRef = useRef<HTMLDivElement>(null)
@@ -156,6 +175,7 @@ const App = () => {
                             <HStack spacing={4}>
                                 {toggle}
                                 {!browser.isLive && <BackToNext onClick={browser.reset} />}
+                                {eclipse && <ShareMenu eclipse={eclipse} />}
                             </HStack>
                             <EclipseHeadline eclipse={eclipse} loading={loading} browse={browser} description={description} longEyebrow />
                             {/* The event line belongs to the countdown, so it sits closer to it than the rhythm between sections. */}
@@ -230,7 +250,10 @@ const App = () => {
                 <Stack spacing={5} position="relative" zIndex={2}>
                     <HStack justify="space-between">
                         <Brand onClick={browser.reset} />
-                        <LocationButton location={location} compact />
+                        <HStack spacing={2}>
+                            {eclipse && <ShareMenu eclipse={eclipse} size={36} />}
+                            <LocationButton location={location} compact />
+                        </HStack>
                     </HStack>
                     {toggle}
                     {/* Swipe left or right here to step; the globe and sheet keep their own drags. */}
