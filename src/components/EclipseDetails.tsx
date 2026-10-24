@@ -1,5 +1,6 @@
 import { Box, SimpleGrid, Text } from '@chakra-ui/react'
 import type { FC, ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { EclipseSummary } from '../data/types'
 import { formatDuration, formatMagnitude, formatUtcTime } from './format'
 
@@ -26,19 +27,20 @@ interface EclipseDetailsProps {
  * takes the Saros series' place, since the eyebrow already names the series.
  */
 export const EclipseDetails: FC<EclipseDetailsProps> = ({ eclipse, compact = false }) => {
+  const { t } = useTranslation()
   const duration = formatDuration(eclipse.durationSec)
   const { peakUtc } = eclipse
 
   return (
     <SimpleGrid columns={3} spacingX={{ base: 4, lg: 6 }}>
-      <Field label={compact ? 'Universal' : 'Universal time'}>
+      <Field label={t(compact ? 'details.universal' : 'details.universalTime')}>
         {formatUtcTime(peakUtc)}
       </Field>
-      <Field label="Magnitude">{formatMagnitude(eclipse.magnitude)}</Field>
+      <Field label={t('details.magnitude')}>{formatMagnitude(eclipse.magnitude)}</Field>
       {duration ? (
-        <Field label={compact ? 'Duration' : 'Greatest duration'}>{duration}</Field>
+        <Field label={t(compact ? 'details.duration' : 'details.greatestDuration')}>{duration}</Field>
       ) : (
-        <Field label={compact ? 'Saros' : 'Saros series'}>{eclipse.saros}</Field>
+        <Field label={t(compact ? 'details.saros' : 'details.sarosSeries')}>{eclipse.saros}</Field>
       )}
     </SimpleGrid>
   )

@@ -4,7 +4,8 @@ import type { EclipseSummary } from '../data/types'
 import { GLOBE_COLORS } from '../globe/palette'
 import { localYear } from '../hooks/timeline'
 import type { EclipseBrowser } from '../hooks/useEclipseBrowser'
-import { KIND_LABEL, TYPE_LABEL, formatDateWithoutYear, formatHeadlineDate, formatShortDate, formatWeekday } from './format'
+import { t } from '../i18n'
+import { eclipseName, eclipseShortName, formatDateWithoutYear, formatHeadlineDate, formatShortDate, formatWeekday } from './format'
 import { StatusChip } from './StatusChip'
 import { TimelineStrip } from './TimelineStrip'
 
@@ -53,8 +54,10 @@ const glass = {
 
 type StepProps = { dir: 'left' | 'right'; target: EclipseSummary | undefined; onClick: () => void }
 
-const stepLabel = (dir: 'left' | 'right', target: EclipseSummary | undefined) =>
-  `${dir === 'left' ? 'Previous' : 'Next'} eclipse${target ? `, ${formatHeadlineDate(target.peakUtc)}` : ''}`
+const stepLabel = (dir: 'left' | 'right', target: EclipseSummary | undefined) => {
+  if (!target) return t(dir === 'left' ? 'headline.previous' : 'headline.next')
+  return t(dir === 'left' ? 'headline.previousOn' : 'headline.nextOn', { date: formatHeadlineDate(target.peakUtc) })
+}
 
 /** Narrow screens: a round icon button either side of the date. */
 const StepButton: FC<StepProps> = ({ dir, target, onClick }) => (
@@ -88,7 +91,7 @@ const StepPill: FC<StepProps> = ({ dir, target, onClick }) => (
     isDisabled={!target}
     onClick={onClick}
   >
-    {target ? formatShortDate(target.peakUtc) : dir === 'left' ? 'No earlier eclipse' : 'No later eclipse'}
+    {target ? formatShortDate(target.peakUtc) : t(dir === 'left' ? 'headline.noEarlier' : 'headline.noLater')}
   </Button>
 )
 
@@ -120,7 +123,7 @@ const YearPicker: FC<{ year: number; years: Set<number>; onChange: (year: number
       {year}
       <YearChevron />
       <chakra.select
-        aria-label="Jump to year"
+        aria-label={t('headline.jumpToYear')}
         value={year}
         onChange={(e) => onChange(Number(e.target.value))}
         position="absolute"
@@ -143,10 +146,13 @@ const YearPicker: FC<{ year: number; years: Set<number>; onChange: (year: number
   )
 }
 
+/** Stands in for the year picker while the date message is formatted, then marks where to split it. */
+const YEAR_SLOT = '⁣'
+
 /** Shown beside the toggle on wide screens while browsing. Compact headlines use the status chip instead. */
 export const BackToNext: FC<{ onClick: () => void }> = ({ onClick }) => (
   <Button {...glass} size="sm" h="32px" px={3.5} borderRadius="full" fontWeight="medium" leftIcon={<BackIcon />} onClick={onClick}>
-    Back to next eclipse
+    {t('site.backToNext')}
   </Button>
 )
 
@@ -170,13 +176,19 @@ export const EclipseHeadline: FC<EclipseHeadlineProps> = ({
   }
   if (!eclipse) return null
 
-  const kind = `${KIND_LABEL[eclipse.kind]} ${TYPE_LABEL[eclipse.type].toLowerCase()}${longEyebrow ? ' eclipse' : ''}`
+  const kind = longEyebrow ? eclipseName(eclipse) : eclipseShortName(eclipse)
   const dot = eclipse.type === 'solar' ? GLOBE_COLORS.solarLimits : GLOBE_COLORS.lunarWhole
   const weekday = formatWeekday(eclipse.peakUtc)
+  // The message places the year ("6 February 2027", "6 de febrero de 2027"); the picker goes where it says.
+  const [beforeYear, afterYear] = t('headline.dateWithYear', {
+    date: formatDateWithoutYear(eclipse.peakUtc, { short: compact }),
+    year: YEAR_SLOT,
+  }).split(YEAR_SLOT)
   const date = (
     <>
-      {formatDateWithoutYear(eclipse.peakUtc, { short: compact })}{' '}
+      {beforeYear}
       <YearPicker year={localYear(eclipse.peakUtc)} years={browse.years} onChange={browse.jumpToYear} />
+      {afterYear}
     </>
   )
 
@@ -184,7 +196,7 @@ export const EclipseHeadline: FC<EclipseHeadlineProps> = ({
     <Stack spacing={{ base: 2, lg: 3 }}>
       {/* Announces each step. The visible date holds the year picker, whose 100 options must not be read out. */}
       <VisuallyHidden aria-live="polite">
-        {`${KIND_LABEL[eclipse.kind]} ${eclipse.type} eclipse, ${formatHeadlineDate(eclipse.peakUtc)}`}
+        {t('headline.announce', { name: eclipseName(eclipse), date: formatHeadlineDate(eclipse.peakUtc) })}
       </VisuallyHidden>
       <HStack spacing={2.5} justify={compact ? 'space-between' : undefined}>
         <HStack spacing={2.5} minW={0}>
@@ -197,7 +209,7 @@ export const EclipseHeadline: FC<EclipseHeadlineProps> = ({
             color="whiteAlpha.800"
             noOfLines={1}
           >
-            {kind} · Saros {eclipse.saros}
+            {kind} · {t('eclipse.saros', { saros: eclipse.saros })}
           </Text>
         </HStack>
         {browse.phase && <StatusChip phase={browse.phase} isLive={browse.isLive} onReturn={compact ? browse.reset : undefined} />}
@@ -222,7 +234,7 @@ export const EclipseHeadline: FC<EclipseHeadlineProps> = ({
             </Text>
             {date}
           </Text>
-          <HStack as="nav" aria-label="Browse eclipses" spacing={3} pt={1}>
+          <HStack as="nav" aria-label={t('headline.browse')} spacing={3} pt={1}>
             <StepPill dir="left" target={browse.previous} onClick={browse.prev} />
             <Box flex={1} minW={0}>
               <TimelineStrip list={browse.list} index={browse.index} now={browse.now} />

@@ -3,6 +3,7 @@ import { useMemo, type FC } from 'react'
 import type { EclipseSummary } from '../data/types'
 import { GLOBE_COLORS } from '../globe/palette'
 import { localYear, timelineStrip } from '../hooks/timeline'
+import { t } from '../i18n'
 import { formatSpan } from './format'
 
 const COLOR = { solar: GLOBE_COLORS.solarLimits, lunar: GLOBE_COLORS.lunarWhole }
@@ -80,7 +81,7 @@ export const TimelineStrip: FC<TimelineStripProps> = ({ list, index, now, compac
           <Box position="absolute" left={pct(strip.now.x)} top={`${mid - (compact ? 9 : 12)}px`} h={compact ? '18px' : '24px'} w="2px" ml="-1px" bg="white" />
           {!compact && (
             <Box position="absolute" left={pct(strip.now.x)} top="-12px" transform="translateX(-50%)">
-              <Mono color="whiteAlpha.800">Now</Mono>
+              <Mono color="whiteAlpha.800">{t('timeline.now')}</Mono>
             </Box>
           )}
         </>
@@ -92,8 +93,8 @@ export const TimelineStrip: FC<TimelineStripProps> = ({ list, index, now, compac
         >
           <Mono color="whiteAlpha.800">
             {strip.now.edge === 'start'
-              ? `‹ Now · ${formatSpan(strip.now.distanceMs)} back`
-              : `Now · ${formatSpan(strip.now.distanceMs)} ahead ›`}
+              ? t('timeline.nowBack', { span: formatSpan(strip.now.distanceMs) })
+              : t('timeline.nowAhead', { span: formatSpan(strip.now.distanceMs) })}
           </Mono>
         </Box>
       )}

@@ -1,5 +1,6 @@
 import { Box, Divider, Flex, HStack, Stack, Text, useBreakpointValue } from "@chakra-ui/react"
 import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type FC } from "react"
+import { useTranslation } from "react-i18next"
 import { Brand } from "./components/Brand"
 import { Countdown, EventLine, EventTimes } from "./components/Countdown"
 import { EclipseDetails } from "./components/EclipseDetails"
@@ -56,11 +57,14 @@ const writeViewToUrl = (filter: EclipseFilter, eclipseId: string | null) => {
     }
 }
 
-const Footnote: FC = () => (
-    <Text fontSize="sm" lineHeight="1.5" color="whiteAlpha.700" maxW="460px">
-        Times are UTC-based; those after 2030 are predictions and may shift by a minute or so. Data: NASA GSFC eclipse catalogs (Espenak &amp; Meeus).
-    </Text>
-)
+const Footnote: FC = () => {
+    const { t } = useTranslation()
+    return (
+        <Text fontSize="sm" lineHeight="1.5" color="whiteAlpha.700" maxW="460px">
+            {t("site.footnote")}
+        </Text>
+    )
+}
 
 const RotateIcon: FC = () => (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
@@ -72,6 +76,7 @@ const RotateIcon: FC = () => (
 const TENSE: Record<Phase, Tense> = { upcoming: "future", now: "present", past: "past" }
 
 const App = () => {
+    const { t } = useTranslation()
     const [filter, setFilter] = useState<EclipseFilter>(readFilterFromUrl)
     const [sharedId] = useState(readEclipseIdFromUrl)
     const browser = useEclipseBrowser(filter, undefined, sharedId)
@@ -212,7 +217,7 @@ const App = () => {
                                 fontSize="xs"
                             >
                                 <RotateIcon />
-                                <Text>Drag to rotate · Scroll to zoom</Text>
+                                <Text>{t("site.globeHint")}</Text>
                             </HStack>
                         </HStack>
                     </Flex>

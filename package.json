@@ -18,14 +18,19 @@
     "@emotion/react": "^11.10.5",
     "@emotion/styled": "^11.10.5",
     "framer-motion": "^8.5.5",
+    "i18next": "^26.5.6",
+    "i18next-icu": "^2.6.1",
+    "intl-messageformat": "^12.1.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-globe.gl": "^2.38.0",
+    "react-i18next": "^17.1.4",
     "three": "^0.186.1"
   },
   "devDependencies": {
     "@fontsource/jetbrains-mono": "^5.3.0",
     "@fontsource/sora": "^5.3.0",
+    "@formatjs/icu-messageformat-parser": "^3.5.22",
     "@resvg/resvg-js": "^2.6.2",
     "@types/react": "^18.0.27",
     "@types/react-dom": "^18.0.10",
@@ -33,7 +38,7 @@
     "satori": "^0.63.2",
     "sharp": "^0.35.5",
     "tsx": "^4.23.15",
-    "typescript": "^4.9.3",
+    "typescript": "^5.9.3",
     "vite": "^4.1.0-beta.1",
     "vitest": "^0.34.6"
   }

@@ -7,6 +7,7 @@ import { buildLayers, centerOf, type Region } from '../globe/layers'
 import { paintZones } from '../globe/zoneTexture'
 import { GLOBE_COLORS } from '../globe/palette'
 import type { Point } from '../globe/visibility'
+import { t } from '../i18n'
 
 // Camera moves are instant for people who asked for less motion.
 const flightMs = (): number =>
@@ -62,7 +63,8 @@ function youMarker(): HTMLElement {
   el.style.cssText = 'display:flex;align-items:flex-end;gap:4px;transform:translate(-11px,-100%);pointer-events:none;'
   el.innerHTML =
     '<svg width="22" height="28" viewBox="0 0 22 28"><path d="M11 27s-10-9-10-16a10 10 0 0 1 20 0c0 7-10 16-10 16z" fill="#fff"/><circle cx="11" cy="11" r="4" fill="#05060b"/></svg>' +
-    '<span style="margin-bottom:12px;padding:2px 8px;border-radius:999px;background:#fff;color:#05060b;font:600 12px Sora,system-ui,sans-serif">You</span>'
+    '<span style="margin-bottom:12px;padding:2px 8px;border-radius:999px;background:#fff;color:#05060b;font:600 12px Sora,system-ui,sans-serif"></span>'
+  el.querySelector('span')!.textContent = t('globe.you')
   return el
 }
 
@@ -121,7 +123,7 @@ export default function EclipseGlobe({ type, geometry, altitude, you = null, toP
   if (!webgl) {
     return (
       <Box h="full" display="flex" alignItems="center" justifyContent="center" p={8}>
-        <Text opacity={0.7}>This view needs WebGL, which this browser does not provide.</Text>
+        <Text opacity={0.7}>{t('globe.noWebgl')}</Text>
       </Box>
     )
   }
@@ -134,7 +136,7 @@ export default function EclipseGlobe({ type, geometry, altitude, you = null, toP
       overflow="hidden"
       opacity={ready ? 1 : 0}
       transition="opacity 0.8s ease"
-      aria-label={`Globe showing ${type} eclipse visibility`}
+      aria-label={t('globe.label', { type })}
       role="img"
     >
       {size.width > 0 && size.height > 0 && (

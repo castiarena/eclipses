@@ -1,12 +1,13 @@
 import { Box, chakra, Text } from '@chakra-ui/react'
 import type { FC } from 'react'
 import type { Phase } from '../hooks/timeline'
+import { t } from '../i18n'
 
-const LABEL: Record<Phase, string> = {
-  upcoming: 'Upcoming',
-  now: 'Happening now',
-  past: 'Past',
-}
+const LABEL_KEY = {
+  upcoming: 'status.upcoming',
+  now: 'status.now',
+  past: 'status.past',
+} as const satisfies Record<Phase, string>
 
 const TONE: Record<Phase, { bg: string; color: string }> = {
   upcoming: { bg: 'rgba(123, 224, 165, 0.14)', color: '#7be0a5' },
@@ -24,11 +25,10 @@ export interface StatusChipState {
 
 /** Where the shown eclipse sits relative to now, and whether the chip offers the way back. */
 export function statusChip(phase: Phase, isLive: boolean): StatusChipState {
-  const label = LABEL[phase]
   return {
-    label,
+    label: t(LABEL_KEY[phase]),
     returnsToLive: !isLive,
-    actionLabel: isLive ? null : `${phase === 'now' ? label : `${label} eclipse`}. Back to the next eclipse`,
+    actionLabel: isLive ? null : t('status.back', { phase }),
   }
 }
 
@@ -85,7 +85,7 @@ export const StatusChip: FC<StatusChipProps> = ({ phase, isLive, onReturn }) => 
       >
         {chip.label}
         <BackIcon />
-        Now
+        {t('status.nowButton')}
       </chakra.button>
     )
   }

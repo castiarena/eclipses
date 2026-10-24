@@ -3,7 +3,8 @@ import type { FC } from 'react'
 import type { EclipseSummary } from '../data/types'
 import { TILES_MAX_MS, type CountdownTarget } from '../hooks/countdown'
 import { nextInSaros, nextOfKind, type Phase } from '../hooks/timeline'
-import { KIND_LABEL, formatDuration, formatShortDate } from './format'
+import { t } from '../i18n'
+import { formatDuration, formatShortDate } from './format'
 
 export interface NextStep {
   id: string
@@ -32,13 +33,13 @@ export function nextSteps(
     const duration = formatDuration(kind.durationSec)
     steps.push({
       id: kind.id,
-      label: `Next ${KIND_LABEL[kind.kind].toLowerCase()} ${kind.type} eclipse`,
+      label: t('nextSteps.nextOfKind', { kind: kind.kind, type: kind.type }),
       value: duration ? `${formatShortDate(kind.peakUtc)} · ${duration}` : formatShortDate(kind.peakUtc),
     })
   }
   const saros = nextInSaros(list, eclipse)
   if (saros && saros.id !== kind?.id) {
-    steps.push({ id: saros.id, label: `Saros ${eclipse.saros} returns`, value: formatShortDate(saros.peakUtc) })
+    steps.push({ id: saros.id, label: t('nextSteps.sarosReturns', { saros: eclipse.saros }), value: formatShortDate(saros.peakUtc) })
   }
   return steps
 }
