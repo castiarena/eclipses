@@ -1,4 +1,4 @@
-import { HStack, Text } from '@chakra-ui/react'
+import { Box, HStack, Text } from '@chakra-ui/react'
 import type { FC } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -23,18 +23,24 @@ const EclipseMark: FC<{ size: number }> = ({ size }) => (
 export const Brand: FC<{ onClick?: () => void }> = ({ onClick }) => {
   const { t } = useTranslation()
   return (
-    <Text as="h1" fontSize="lg" fontWeight="semibold" letterSpacing="-0.01em">
+    // minW 0 lets a long name (other languages) truncate beside the header buttons instead of pushing them out.
+    <Text as="h1" fontSize="lg" fontWeight="semibold" letterSpacing="-0.01em" minW={0}>
       <HStack
         as="button"
         type="button"
         spacing={3}
+        maxW="full"
         onClick={onClick}
         title={t('site.backToNext')}
         borderRadius="md"
         _focusVisible={{ outline: '2px solid', outlineColor: 'accent.300', outlineOffset: '4px' }}
       >
-        <EclipseMark size={28} />
-        <span>{t('site.name')}</span>
+        <Box flexShrink={0} display="flex">
+          <EclipseMark size={28} />
+        </Box>
+        <Text as="span" noOfLines={1} textAlign="left">
+          {t('site.name')}
+        </Text>
       </HStack>
     </Text>
   )

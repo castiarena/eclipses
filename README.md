@@ -14,7 +14,7 @@ The site origin defaults to `https://castiarena.github.io`; set `SITE_ORIGIN` to
 
 ## Languages
 
-English lives at the root and every other language under its code: `/es/`, `/es/e/<id>/`. The switcher in the footer moves the current page to another language. All text is in `src/i18n/locales/<code>.json` (ICU messages), read through i18next; `en.json` is the source of truth.
+English lives at the root and every other language under its code: `/es/`, `/es/e/<id>/`. The language button in the header, beside "Check my location", moves the current page to another language. All text is in `src/i18n/locales/<code>.json` (ICU messages), read through i18next; `en.json` is the source of truth.
 
 To add a language:
 
