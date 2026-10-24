@@ -2,7 +2,8 @@ import { IconButton, Menu, MenuButton, MenuItem, MenuList, Portal, useToast } fr
 import type { FC, ReactNode } from 'react'
 import type { EclipseSummary } from '../data/types'
 import { buildMeta } from '../share/meta'
-import { SHARE_TARGETS, shareIntentUrl, type ShareTargetId } from '../share/targets'
+import { useTranslation } from 'react-i18next'
+import { shareIntentUrl, shareTargets, type ShareTargetId } from '../share/targets'
 import { appBase } from '../share/url'
 
 const Icon: FC<{ children: ReactNode }> = ({ children }) => (
@@ -88,6 +89,7 @@ const glass = {
 
 /** Share button with the five ways out: copy the link, WhatsApp, Instagram, Facebook and X. */
 export const ShareMenu: FC<{ eclipse: EclipseSummary; size?: number }> = ({ eclipse, size = 40 }) => {
+  const { t } = useTranslation()
   const toast = useToast()
   const meta = buildMeta(eclipse, window.location.origin, appBase())
 
@@ -95,11 +97,11 @@ export const ShareMenu: FC<{ eclipse: EclipseSummary; size?: number }> = ({ ecli
   const copy = async (title: string) => {
     const ok = await copyText(meta.url)
     if (ok) note(title)
-    else toast({ title: "Couldn't copy the link", description: meta.url, status: 'error', duration: 6000, position: 'bottom' })
+    else toast({ title: t('share.copyFailed'), description: meta.url, status: 'error', duration: 6000, position: 'bottom' })
   }
 
   const share = async (id: ShareTargetId) => {
-    if (id === 'link') return copy('Link copied')
+    if (id === 'link') return copy(t('share.copied'))
     if (id === 'instagram') {
       // Instagram takes no links from the web: hand the link to the phone's share sheet, where it can be picked.
       if (typeof navigator.share === 'function') {
@@ -110,7 +112,7 @@ export const ShareMenu: FC<{ eclipse: EclipseSummary; size?: number }> = ({ ecli
         }
         return
       }
-      return copy('Link copied. Paste it in your Instagram bio or story')
+      return copy(t('share.copiedInstagram'))
     }
     window.open(shareIntentUrl(id, meta.title, meta.url), '_blank', 'noopener,noreferrer')
   }
@@ -120,7 +122,7 @@ export const ShareMenu: FC<{ eclipse: EclipseSummary; size?: number }> = ({ ecli
       <MenuButton
         as={IconButton}
         {...glass}
-        aria-label="Share this eclipse"
+        aria-label={t('share.label')}
         icon={<ShareIcon />}
         isRound
         w={`${size}px`}
@@ -129,7 +131,7 @@ export const ShareMenu: FC<{ eclipse: EclipseSummary; size?: number }> = ({ ecli
       />
       <Portal>
         <MenuList bg="rgba(10, 11, 20, 0.92)" borderColor="whiteAlpha.300" backdropFilter="blur(10px)" minW="180px" zIndex="popover">
-          {SHARE_TARGETS.map(({ id, label }) => (
+          {shareTargets().map(({ id, label }) => (
             <MenuItem key={id} icon={<span>{ICONS[id]}</span>} bg="transparent" _hover={{ bg: 'whiteAlpha.200' }} _focus={{ bg: 'whiteAlpha.200' }} onClick={() => share(id)}>
               {label}
             </MenuItem>

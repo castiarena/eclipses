@@ -1,5 +1,6 @@
 import { Box, Stack } from '@chakra-ui/react'
 import { useEffect, useRef, useState, type FC, type PointerEvent, type ReactNode } from 'react'
+import { t } from '../i18n'
 
 /** Gap between the sheet and the screen's bottom and sides, and under the content it opens up to. */
 const GAP = 12
@@ -154,7 +155,7 @@ export const MobileSheet: FC<MobileSheetProps> = ({ header, children, expandedTo
         <Box
           as="button"
           type="button"
-          aria-label={open ? 'Hide details' : 'Show details'}
+          aria-label={t(open ? 'sheet.hide' : 'sheet.show')}
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
           display="block"

@@ -1,7 +1,8 @@
 import { Box, Button } from '@chakra-ui/react'
 import type { FC } from 'react'
 import type { EclipseFilter } from '../data/types'
-import { FILTER_LABEL } from './format'
+import { t } from '../i18n'
+import { FILTER_KEY } from './format'
 
 const FILTERS: EclipseFilter[] = ['solar', 'lunar', 'all']
 
@@ -16,7 +17,7 @@ interface EclipseTypeToggleProps {
 export const EclipseTypeToggle: FC<EclipseTypeToggleProps> = ({ value, onChange, onReselect }) => (
   <Box
     role="group"
-    aria-label="Eclipse type"
+    aria-label={t('filter.label')}
     display="flex"
     w={{ base: 'full', lg: '360px' }}
     p={1}
@@ -43,7 +44,7 @@ export const EclipseTypeToggle: FC<EclipseTypeToggleProps> = ({ value, onChange,
           aria-pressed={selected}
           onClick={() => (selected ? onReselect?.() : onChange(filter))}
         >
-          {FILTER_LABEL[filter]}
+          {t(FILTER_KEY[filter])}
         </Button>
       )
     })}

@@ -4,7 +4,8 @@
 
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { buildMeta, metaTags, ogImagePath, SITE_DESCRIPTION, SITE_NAME } from '../src/share/meta.ts'
+import { t } from '../src/i18n/index.ts'
+import { buildMeta, metaTags, ogImagePath } from '../src/share/meta.ts'
 import { eclipsePath } from '../src/share/url.ts'
 import { BASE, DIST, ORIGIN, readEclipses } from './site.mts'
 
@@ -23,11 +24,11 @@ const eclipses = await readEclipses()
 const home = withMeta(
   template,
   metaTags({
-    title: SITE_NAME,
-    description: SITE_DESCRIPTION,
+    title: t('site.name'),
+    description: t('site.description'),
     url: `${ORIGIN}${BASE}`,
     image: `${ORIGIN}${ogImagePath('default', BASE)}`,
-    imageAlt: 'A solar eclipse over the Earth',
+    imageAlt: t('meta.defaultImageAlt'),
   }),
 )
 await writeFile(join(DIST, 'index.html'), home)

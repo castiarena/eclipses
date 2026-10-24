@@ -4,16 +4,25 @@ import type { FC, ReactNode } from 'react'
 import { eventProgress, TILES_MAX_MS, type CountdownTarget, type Remaining } from '../hooks/countdown'
 import type { Phase } from '../hooks/timeline'
 import type { EclipseFilter, EclipseSummary } from '../data/types'
+import { useTranslation } from 'react-i18next'
+import { t } from '../i18n'
 import { formatEndsIn, formatEventTime, formatLongSpan, formatSpan, utcOffsetLabel } from './format'
 
 const UNITS: (keyof Remaining)[] = ['days', 'hours', 'minutes', 'seconds']
 
-const SHORT_LABEL: Record<keyof Remaining, string> = {
-  days: 'days',
-  hours: 'hrs',
-  minutes: 'min',
-  seconds: 'sec',
-}
+const UNIT_KEY = {
+  days: 'countdown.days',
+  hours: 'countdown.hours',
+  minutes: 'countdown.minutes',
+  seconds: 'countdown.seconds',
+} as const satisfies Record<keyof Remaining, string>
+
+const SHORT_UNIT_KEY = {
+  days: 'countdown.daysShort',
+  hours: 'countdown.hoursShort',
+  minutes: 'countdown.minutesShort',
+  seconds: 'countdown.secondsShort',
+} as const satisfies Record<keyof Remaining, string>
 
 const pad = (n: number) => String(n).padStart(2, '0')
 
@@ -51,11 +60,11 @@ const pulse = keyframes`
 
 const reducedMotion = { '@media (prefers-reduced-motion: reduce)': { animation: 'none' } }
 
-const TARGET_LABEL: Record<CountdownTarget['target'], string> = {
-  start: 'Begins in',
-  peak: 'Peak in',
-  end: 'Ends in',
-}
+const TARGET_KEY = {
+  start: 'countdown.start',
+  peak: 'countdown.peak',
+  end: 'countdown.end',
+} as const satisfies Record<CountdownTarget['target'], string>
 
 /** The line above the tiles: always says what they count to. */
 const Label: FC<{ children: string; live?: boolean }> = ({ children, live = false }) => (
@@ -119,11 +128,12 @@ interface CountdownProps {
  * it's far off, happening, or over.
  */
 export const Countdown: FC<CountdownProps> = ({ eclipse, phase, target, remaining, now, loading, filter, pinned = false, shortLabels = false }) => {
+  const { t } = useTranslation()
   if (loading) {
     return (
       <Stack spacing={2.5}>
         <Box h="18px" />
-        <SimpleGrid columns={4} spacing={{ base: 2, sm: 3 }} aria-label="Loading next eclipse">
+        <SimpleGrid columns={4} spacing={{ base: 2, sm: 3 }} aria-label={t('countdown.loading')}>
           {UNITS.map((unit) => (
             <Skeleton key={unit} h={TILE_HEIGHT} borderRadius="xl" startColor="whiteAlpha.50" endColor="whiteAlpha.200" />
           ))}
@@ -133,14 +143,14 @@ export const Countdown: FC<CountdownProps> = ({ eclipse, phase, target, remainin
   }
 
   if (!eclipse || !phase) {
-    return <Text opacity={0.8}>No upcoming {filter === 'all' ? '' : `${filter} `}eclipse in the catalog.</Text>
+    return <Text opacity={0.8}>{t('countdown.empty', { filter })}</Text>
   }
 
   if (phase === 'past' || !target) {
     return (
       <Stack spacing={2.5}>
-        <Label>Ended</Label>
-        <Statement quiet title={`Happened ${formatSpan(now - Date.parse(eclipse.endUtc))} ago`} />
+        <Label>{t('countdown.ended')}</Label>
+        <Statement quiet title={t('countdown.happenedAgo', { span: formatSpan(now - Date.parse(eclipse.endUtc)) })} />
       </Stack>
     )
   }
@@ -149,8 +159,8 @@ export const Countdown: FC<CountdownProps> = ({ eclipse, phase, target, remainin
     const progress = eventProgress(eclipse, now)
     return (
       <Stack spacing={2.5} role="timer">
-        <Label live>Happening now</Label>
-        <Statement title={remaining ? `${TARGET_LABEL[target.target]} ${formatEndsIn(remaining)}` : 'Happening now'}>
+        <Label live>{t('status.now')}</Label>
+        <Statement title={remaining ? t('countdown.targetIn', { label: t(TARGET_KEY[target.target]), time: formatEndsIn(remaining) }) : t('status.now')}>
           <ProgressBar now={progress.now} peak={progress.peak} />
         </Statement>
       </Stack>
@@ -161,24 +171,23 @@ export const Countdown: FC<CountdownProps> = ({ eclipse, phase, target, remainin
   if (untilTarget > TILES_MAX_MS || !remaining) {
     return (
       <Stack spacing={2.5}>
-        <Label>{TARGET_LABEL[target.target]}</Label>
+        <Label>{t(TARGET_KEY[target.target])}</Label>
         <Statement quiet title={formatLongSpan(untilTarget)} />
       </Stack>
     )
   }
 
-  const what = target.target === 'peak' ? 'peak' : 'start'
   return (
     <Stack spacing={2.5}>
-      <Label>{TARGET_LABEL[target.target]}</Label>
+      <Label>{t(TARGET_KEY[target.target])}</Label>
       <SimpleGrid
         columns={4}
         spacing={{ base: 2, sm: 3 }}
         role="timer"
-        aria-label={`Time until the ${what} of ${pinned ? 'this' : 'the next'} ${eclipse.type} eclipse`}
+        aria-label={t('countdown.timerLabel', { target: target.target, pinned: pinned ? 'yes' : 'no', type: eclipse.type })}
       >
         {UNITS.map((unit) => (
-          <DigitTile key={unit} label={shortLabels ? SHORT_LABEL[unit] : unit} value={remaining[unit]} />
+          <DigitTile key={unit} label={t(shortLabels ? SHORT_UNIT_KEY[unit] : UNIT_KEY[unit])} value={remaining[unit]} />
         ))}
       </SimpleGrid>
     </Stack>
@@ -188,9 +197,9 @@ export const Countdown: FC<CountdownProps> = ({ eclipse, phase, target, remainin
 const eventPoints = (eclipse: EclipseSummary) => {
   const approx = eclipse.type === 'solar' ? '~' : ''
   return [
-    { key: 'start', label: `Starts ${approx}${formatEventTime(eclipse.startUtc, eclipse.peakUtc)}`, align: 'left' },
-    { key: 'peak', label: `Peak ${formatEventTime(eclipse.peakUtc, eclipse.peakUtc)}`, align: 'center' },
-    { key: 'end', label: `Ends ${approx}${formatEventTime(eclipse.endUtc, eclipse.peakUtc)}`, align: 'right' },
+    { key: 'start', label: t('countdown.starts', { time: approx + formatEventTime(eclipse.startUtc, eclipse.peakUtc) }), align: 'left' },
+    { key: 'peak', label: t('countdown.peakAt', { time: formatEventTime(eclipse.peakUtc, eclipse.peakUtc) }), align: 'center' },
+    { key: 'end', label: t('countdown.ends', { time: approx + formatEventTime(eclipse.endUtc, eclipse.peakUtc) }), align: 'right' },
   ] as const
 }
 
@@ -208,6 +217,7 @@ export const EventTimes: FC<{ eclipse: EclipseSummary }> = ({ eclipse }) => (
  * they get a "~". The moment the countdown targets is drawn filled.
  */
 export const EventLine: FC<{ eclipse: EclipseSummary }> = ({ eclipse }) => {
+  const { t } = useTranslation()
   const filled = eclipse.type === 'solar' ? 'peak' : 'start'
   const points = eventPoints(eclipse)
   const color = eclipse.type === 'solar' ? 'solar.path' : 'lunar.whole'
@@ -215,7 +225,7 @@ export const EventLine: FC<{ eclipse: EclipseSummary }> = ({ eclipse }) => {
   return (
     <Stack spacing={2}>
       <Text fontFamily="mono" fontSize="2xs" textTransform="uppercase" letterSpacing="0.16em" color="whiteAlpha.700">
-        Your time · {utcOffsetLabel(eclipse.peakUtc)}
+        {t('countdown.yourTime', { offset: utcOffsetLabel(eclipse.peakUtc) })}
       </Text>
       <Box position="relative" h="14px" aria-hidden="true">
         <Box position="absolute" left="6px" right="6px" top="6px" h="2px" bg={color} opacity={0.5} />

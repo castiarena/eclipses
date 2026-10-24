@@ -1,9 +1,12 @@
-import { formatDuration, formatHeadlineDate, formatMagnitude, KIND_LABEL, TYPE_LABEL } from '../components/format'
+import { eclipseName, formatDuration, formatHeadlineDate, formatMagnitude } from '../components/format'
 import type { EclipseSummary } from '../data/types'
+import { t } from '../i18n'
 import { eclipsePath } from './url'
 
-export const SITE_NAME = 'Next eclipse'
-export const SITE_DESCRIPTION = 'Countdown to the next solar and lunar eclipse, and a 3D globe of where each one can be seen.'
+export { eclipseName }
+
+// Read at import, so in English: the OG cards are drawn once for every language.
+export const SITE_NAME = t('site.name')
 
 export interface EclipseMeta {
   title: string
@@ -17,29 +20,28 @@ export interface EclipseMeta {
 
 export const OG_IMAGE_SIZE = { width: 1200, height: 630 }
 
-/** "Total solar eclipse" */
-export function eclipseName(eclipse: Pick<EclipseSummary, 'kind' | 'type'>): string {
-  return `${KIND_LABEL[eclipse.kind]} ${TYPE_LABEL[eclipse.type].toLowerCase()} eclipse`
-}
-
 /** Path of an eclipse's card under `base`. */
 export const ogImagePath = (id: string, base = '/') => `${base.endsWith('/') ? base : `${base}/`}og/${id}.png`
 
 /**
- * Link-preview text for one eclipse. Dates are UTC and timeless ("on", not "in 3 days"),
+ * Link-preview text for one eclipse, in the current locale. Dates are UTC and timeless ("on", not "in 3 days"),
  * since the page is rendered once at build and read long after.
  */
 export function buildMeta(eclipse: EclipseSummary, origin: string, base = '/'): EclipseMeta {
   const date = formatHeadlineDate(eclipse.peakUtc, 'UTC')
   const name = eclipseName(eclipse)
   const duration = formatDuration(eclipse.durationSec)
-  const facts = [`Magnitude ${formatMagnitude(eclipse.magnitude)}`, duration && `Up to ${duration}`, `Saros ${eclipse.saros}`]
+  const facts = [
+    t('meta.magnitude', { value: formatMagnitude(eclipse.magnitude) }),
+    duration && t('meta.upTo', { duration }),
+    t('eclipse.saros', { saros: eclipse.saros }),
+  ]
   return {
-    title: `${name} · ${date}`,
-    description: `${name} on ${date}. ${facts.filter(Boolean).join(' · ')}. Countdown and where it can be seen.`,
+    title: t('meta.title', { name, date }),
+    description: t('meta.description', { name, date, facts: facts.filter(Boolean).join(' · ') }),
     url: `${origin}${eclipsePath(eclipse.id, base)}`,
     image: `${origin}${ogImagePath(eclipse.id, base)}`,
-    imageAlt: `${name} on ${date}`,
+    imageAlt: t('meta.imageAlt', { name, date }),
   }
 }
 
@@ -48,15 +50,15 @@ export const escapeHtml = (s: string) => s.replace(/[&<>"]/g, (c) => ESCAPES[c])
 
 /** The `<head>` tags for a link preview: title, description, canonical, Open Graph and Twitter card. */
 export function metaTags(m: { title: string; description: string; url: string; image: string; imageAlt: string }): string {
-  const t = escapeHtml
-  const prop = (k: string, v: string | number) => `    <meta property="${k}" content="${t(String(v))}" />`
-  const name = (k: string, v: string) => `    <meta name="${k}" content="${t(v)}" />`
+  const e = escapeHtml
+  const prop = (k: string, v: string | number) => `    <meta property="${k}" content="${e(String(v))}" />`
+  const name = (k: string, v: string) => `    <meta name="${k}" content="${e(v)}" />`
   return [
-    `    <title>${t(m.title)}</title>`,
+    `    <title>${e(m.title)}</title>`,
     name('description', m.description),
-    `    <link rel="canonical" href="${t(m.url)}" />`,
+    `    <link rel="canonical" href="${e(m.url)}" />`,
     prop('og:type', 'website'),
-    prop('og:site_name', SITE_NAME),
+    prop('og:site_name', t('site.name')),
     prop('og:title', m.title),
     prop('og:description', m.description),
     prop('og:url', m.url),

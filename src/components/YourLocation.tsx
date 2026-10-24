@@ -2,8 +2,10 @@ import { Box, Button, HStack, IconButton, Stack, Text } from '@chakra-ui/react'
 import { useMemo, useState, type FC } from 'react'
 import type { EclipseGeometry, EclipseKind, EclipseSummary } from '../data/types'
 import type { Tense } from '../globe/describe'
-import { locationVerdict, type LocationVerdict } from '../globe/distance'
+import { locationVerdict, type Leg, type LocationVerdict } from '../globe/distance'
 import type { Point } from '../globe/visibility'
+import { useTranslation } from 'react-i18next'
+import { t } from '../i18n'
 import { formatKm } from './format'
 
 type Status =
@@ -12,68 +14,39 @@ type Status =
   | { kind: 'error'; message: string }
   | { kind: 'done'; position: Point }
 
-const UNKNOWN = 'The map cannot tell for this location.'
-const NO_MAP = 'There is no visibility map for this eclipse.'
-
 /** Within this distance of the centre line, a distance would be noise. */
 const ON_CENTRE_KM = 10
 
-const PATH_NAME: Partial<Record<EclipseKind, string>> = {
-  total: 'totality',
-  annular: 'annularity',
-  hybrid: 'totality or annularity',
-}
+/** What a solar path lets you see: "totality", "annularity". */
+const sightOf = (kind: EclipseKind) =>
+  t(kind === 'total' ? 'location.sight.total' : kind === 'annular' ? 'location.sight.annular' : 'location.sight.hybrid')
 
-const LUNAR: Record<Tense, Record<'whole' | 'part' | 'not-visible', string>> = {
-  future: {
-    whole: 'The Moon is up for the whole eclipse from your location.',
-    part: 'The Moon is up for part of the eclipse from your location.',
-    'not-visible': 'The Moon is below the horizon from your location.',
-  },
-  present: {
-    whole: 'The Moon is up for the whole eclipse from your location. Look up now.',
-    part: 'The Moon is up for part of the eclipse from your location.',
-    'not-visible': 'The Moon is below the horizon from your location.',
-  },
-  past: {
-    whole: 'The Moon was up for the whole eclipse from your location.',
-    part: 'The Moon was up for part of the eclipse from your location.',
-    'not-visible': 'The Moon was below the horizon from your location.',
-  },
-}
+/** "180 km south-east" */
+const distanceTo = (leg: Leg) => t('location.distance', { km: formatKm(leg.km), direction: t(`compass.${leg.direction}`) })
 
 /** What to tell the viewer about the shown eclipse from where they are. */
 export function verdictMessage(eclipse: Pick<EclipseSummary, 'type' | 'kind'>, verdict: LocationVerdict, tense: Tense): string {
-  const path = `path of ${PATH_NAME[eclipse.kind] ?? 'totality or annularity'}`
-  const is = tense === 'past' ? 'was' : 'is'
+  const sight = sightOf(eclipse.kind)
   switch (verdict.kind) {
     case 'in-path': {
       const centre = verdict.toCentre
-      const where = !centre
-        ? ''
-        : centre.km < ON_CENTRE_KM
-          ? ', right by the centre line'
-          : `, ${formatKm(centre.km)} from the centre line`
-      const now = tense === 'present' ? ', and it is happening now' : ''
-      return `Your location ${is} in the ${path}${where}${now}.`
+      const where = !centre ? 'none' : centre.km < ON_CENTRE_KM ? 'centre' : 'km'
+      return t('location.inPath', { tense, sight, where, km: centre ? formatKm(centre.km) : '' })
     }
-    case 'near-path': {
-      const partial =
-        tense === 'past' ? 'A partial eclipse was likely visible from here.' : 'A partial eclipse is likely visible from here.'
-      return `The ${path} ${is} ${formatKm(verdict.toPath.km)} ${verdict.toPath.direction} of you. ${partial}`
-    }
-    case 'far-from-path': {
-      const partial = tense === 'past' ? 'A partial eclipse may have been visible' : 'A partial eclipse may still be visible'
-      return `The ${path} ${is} ${formatKm(verdict.toPath.km)} ${verdict.toPath.direction} of you. ${partial}; partial zones are not mapped.`
-    }
+    case 'near-path':
+      return t('location.nearPath', { tense, sight, km: formatKm(verdict.toPath.km), direction: t(`compass.${verdict.toPath.direction}`) })
+    case 'far-from-path':
+      return t('location.farFromPath', { tense, sight, km: formatKm(verdict.toPath.km), direction: t(`compass.${verdict.toPath.direction}`) })
     case 'whole':
+      return t('location.lunarWhole', { tense })
     case 'part':
+      return t('location.lunarPart', { tense })
     case 'not-visible':
-      return LUNAR[tense][verdict.kind]
+      return t('location.lunarNotVisible', { tense })
     case 'unknown':
-      return UNKNOWN
+      return t('location.unknown')
     case 'no-map':
-      return NO_MAP
+      return t('location.noMap')
   }
 }
 
@@ -101,31 +74,34 @@ export interface AnswerCard {
 /** The location answer as a card: a verdict badge, one headline line, and the full sentence. */
 export function answerCard(eclipse: Pick<EclipseSummary, 'type' | 'kind'>, verdict: LocationVerdict, tense: Tense): AnswerCard {
   const body = verdictMessage(eclipse, verdict, tense)
-  const past = tense === 'past'
-  const sight = PATH_NAME[eclipse.kind] ?? 'totality or annularity'
   switch (verdict.kind) {
     case 'in-path':
-      return { badge: 'In the path', tone: 'gold', title: past ? `You were in ${sight}` : `You'll see ${sight}`, body }
+      return { badge: t('location.badge.inPath'), tone: 'gold', title: t('location.title.inPath', { tense, sight: sightOf(eclipse.kind) }), body }
     case 'near-path':
-      return { badge: 'Near the path', tone: 'goldSoft', title: `${formatKm(verdict.toPath.km)} ${verdict.toPath.direction}`, body }
+      return { badge: t('location.badge.nearPath'), tone: 'goldSoft', title: distanceTo(verdict.toPath), body }
     case 'far-from-path':
-      return { badge: 'Far from the path', tone: 'neutral', title: `${formatKm(verdict.toPath.km)} ${verdict.toPath.direction}`, body }
+      return { badge: t('location.badge.farFromPath'), tone: 'neutral', title: distanceTo(verdict.toPath), body }
     case 'whole':
-      return { badge: 'The whole eclipse', tone: 'violet', title: 'Moon up start to end', body }
+      return { badge: t('location.badge.whole'), tone: 'violet', title: t('location.title.whole'), body }
     case 'part':
-      return { badge: 'Part of it', tone: 'violetSoft', title: 'Moon up for part of it', body }
+      return { badge: t('location.badge.part'), tone: 'violetSoft', title: t('location.title.part'), body }
     case 'not-visible':
-      return { badge: 'Not visible', tone: 'muted', title: 'Moon below your horizon', body }
+      return { badge: t('location.badge.notVisible'), tone: 'muted', title: t('location.title.notVisible'), body }
     case 'unknown':
-      return { badge: 'Unknown', tone: 'muted', title: 'The map can’t tell', body }
+      return { badge: t('location.badge.unknown'), tone: 'muted', title: t('location.title.unknown'), body }
     case 'no-map':
-      return { badge: 'No map', tone: 'muted', title: 'No visibility map', body }
+      return { badge: t('location.badge.noMap'), tone: 'muted', title: t('location.title.noMap'), body }
   }
 }
 
 /** "34.6°S 58.4°W": the app has no place names, so the button shows where it thinks you are. */
 export function formatCoords({ lat, lng }: Point): string {
-  return `${Math.abs(lat).toFixed(1)}°${lat < 0 ? 'S' : 'N'} ${Math.abs(lng).toFixed(1)}°${lng < 0 ? 'W' : 'E'}`
+  return t('location.coords', {
+    latitude: Math.abs(lat).toFixed(1),
+    northSouth: t(lat < 0 ? 'compass.S' : 'compass.N'),
+    longitude: Math.abs(lng).toFixed(1),
+    eastWest: t(lng < 0 ? 'compass.W' : 'compass.E'),
+  })
 }
 
 export interface MyLocation {
@@ -155,13 +131,13 @@ export function useMyLocation(
 
   const check = () => {
     if (!navigator.geolocation) {
-      setStatus({ kind: 'error', message: 'This browser cannot share its location.' })
+      setStatus({ kind: 'error', message: t('location.unsupported') })
       return
     }
     setStatus({ kind: 'locating' })
     navigator.geolocation.getCurrentPosition(
       (pos) => setStatus({ kind: 'done', position: { lat: pos.coords.latitude, lng: pos.coords.longitude } }),
-      () => setStatus({ kind: 'error', message: 'Allow location for this site in your browser, then try again.' }),
+      () => setStatus({ kind: 'error', message: t('location.denied') }),
       { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 },
     )
   }
@@ -200,12 +176,13 @@ const glass = {
 
 /** "Check my location", or once shared, the coordinates it's answering for (clicking checks again). */
 export const LocationButton: FC<{ location: MyLocation; compact?: boolean }> = ({ location, compact = false }) => {
+  const { t } = useTranslation()
   const coords = location.position ? formatCoords(location.position) : null
   return compact ? (
     <IconButton
       {...glass}
       borderColor={coords ? 'rgba(123, 224, 165, 0.5)' : glass.borderColor}
-      aria-label={coords ? `Location on, ${coords}. Check again` : 'Check my location'}
+      aria-label={coords ? t('location.on', { coords }) : t('location.check')}
       icon={<PinIcon size={20} color={coords ? ON : undefined} />}
       isRound
       w="44px"
@@ -222,19 +199,19 @@ export const LocationButton: FC<{ location: MyLocation; compact?: boolean }> = (
       px={5}
       fontWeight="semibold"
       isLoading={location.locating}
-      loadingText="Locating"
+      loadingText={t('location.locating')}
       onClick={location.check}
-      aria-label={coords ? `Location on, ${coords}. Check again` : undefined}
+      aria-label={coords ? t('location.on', { coords }) : undefined}
     >
       {coords ? (
         <>
           {coords}
           <Text as="span" fontWeight="normal" color="whiteAlpha.600" ml={1.5}>
-            · Change
+            {t('location.change')}
           </Text>
         </>
       ) : (
-        'Check my location'
+        t('location.check')
       )}
     </Button>
   )
@@ -259,8 +236,9 @@ export const LocationCard: FC<{ location: MyLocation; eclipse: EclipseSummary | 
   tense,
   compact = false,
 }) => {
+  const { t } = useTranslation()
   const card: AnswerCard | null = location.error
-    ? { badge: 'Location blocked', tone: 'warn', title: 'We can’t see where you are', body: location.error }
+    ? { badge: t('location.badge.blocked'), tone: 'warn', title: t('location.title.blocked'), body: location.error }
     : eclipse && location.verdict
       ? answerCard(eclipse, location.verdict, tense)
       : null
@@ -272,7 +250,7 @@ export const LocationCard: FC<{ location: MyLocation; eclipse: EclipseSummary | 
         <Badge tone={card.tone}>{card.badge}</Badge>
         {!location.error && (
           <Text fontFamily="mono" fontSize="2xs" letterSpacing="0.14em" textTransform="uppercase" color="whiteAlpha.700">
-            From your location
+            {t('location.fromYours')}
           </Text>
         )}
       </HStack>
@@ -285,7 +263,7 @@ export const LocationCard: FC<{ location: MyLocation; eclipse: EclipseSummary | 
       {location.error && (
         <Box>
           <Button {...glass} size="sm" h="36px" borderRadius="full" onClick={location.check} isLoading={location.locating}>
-            Try again
+            {t('location.tryAgain')}
           </Button>
         </Box>
       )}

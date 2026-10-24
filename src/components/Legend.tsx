@@ -2,7 +2,8 @@ import { Box, HStack, Text } from '@chakra-ui/react'
 import type { FC } from 'react'
 import type { EclipseSummary } from '../data/types'
 import { GLOBE_COLORS } from '../globe/palette'
-import { CENTRAL_PATH_LABEL } from './format'
+import { t } from '../i18n'
+import { CENTRAL_PATH_KEY } from './format'
 
 interface LegendItem {
   label: string
@@ -17,12 +18,14 @@ export function legendFor(eclipse: EclipseSummary): LegendItem[] {
   if (!eclipse.hasGeometry) return []
   if (eclipse.type === 'lunar') {
     return [
-      { label: 'Moon up the whole time', shortLabel: 'Whole eclipse', color: GLOBE_COLORS.lunarWhole, mark: 'area' },
-      { label: 'For part of it', shortLabel: 'Part of it', color: GLOBE_COLORS.lunarHatch, mark: 'hatched' },
+      { label: t('legend.lunarWhole'), shortLabel: t('legend.lunarWholeShort'), color: GLOBE_COLORS.lunarWhole, mark: 'area' },
+      { label: t('legend.lunarPart'), shortLabel: t('legend.lunarPartShort'), color: GLOBE_COLORS.lunarHatch, mark: 'hatched' },
     ]
   }
-  const label = CENTRAL_PATH_LABEL[eclipse.kind]
-  return label ? [{ label, shortLabel: label, color: GLOBE_COLORS.solarLimits, mark: 'bar' }] : []
+  const key = CENTRAL_PATH_KEY[eclipse.kind as keyof typeof CENTRAL_PATH_KEY]
+  if (!key) return []
+  const label = t(key)
+  return [{ label, shortLabel: label, color: GLOBE_COLORS.solarLimits, mark: 'bar' }]
 }
 
 const Mark: FC<{ item: LegendItem }> = ({ item }) => {

@@ -1,7 +1,10 @@
+import { t } from '../i18n'
+
 export type ShareTargetId = 'link' | 'whatsapp' | 'instagram' | 'facebook' | 'x'
 
-export const SHARE_TARGETS: { id: ShareTargetId; label: string }[] = [
-  { id: 'link', label: 'Copy link' },
+// Brand names stay as they are in every language.
+export const shareTargets = (): { id: ShareTargetId; label: string }[] => [
+  { id: 'link', label: t('share.copyLink') },
   { id: 'whatsapp', label: 'WhatsApp' },
   { id: 'instagram', label: 'Instagram' },
   { id: 'facebook', label: 'Facebook' },

@@ -1,33 +1,35 @@
 import type { EclipseFilter, EclipseKind, EclipseType } from '../data/types'
 import type { Remaining } from '../hooks/countdown'
+import { intlLocale, t } from '../i18n'
 
-export const TYPE_LABEL: Record<EclipseType, string> = {
-  solar: 'Solar',
-  lunar: 'Lunar',
-}
-
-export const FILTER_LABEL: Record<EclipseFilter, string> = { ...TYPE_LABEL, all: 'All' }
-
-export const KIND_LABEL: Record<EclipseKind, string> = {
-  total: 'Total',
-  annular: 'Annular',
-  hybrid: 'Hybrid',
-  partial: 'Partial',
-  penumbral: 'Penumbral',
-}
+export const FILTER_KEY = {
+  solar: 'filter.solar',
+  lunar: 'filter.lunar',
+  all: 'filter.all',
+} as const satisfies Record<EclipseFilter, string>
 
 /** Legend label for a solar eclipse's central path. */
-export const CENTRAL_PATH_LABEL: Partial<Record<EclipseKind, string>> = {
-  total: 'Path of totality',
-  annular: 'Path of annularity',
-  hybrid: 'Path of totality / annularity',
-}
+export const CENTRAL_PATH_KEY = {
+  total: 'legend.centralPath.total',
+  annular: 'legend.centralPath.annular',
+  hybrid: 'legend.centralPath.hybrid',
+} as const satisfies Partial<Record<EclipseKind, string>>
 
-// Dates are written the British way ("Saturday, 20 February 2027") to match the design.
-const LOCALE = 'en-GB'
+type Named = { kind: EclipseKind; type: EclipseType }
 
+/** "Total solar eclipse" */
+export const eclipseName = ({ kind, type }: Named): string => t('eclipse.name', { kind, type })
+
+/** "Total solar", for the eyebrow. */
+export const eclipseShortName = ({ kind, type }: Named): string => t('eclipse.shortName', { kind, type })
+
+// Dates follow the locale's own pattern; `LOCALES` picks en-GB for English to match the design.
+const formatDate = (iso: string, options: Intl.DateTimeFormatOptions, timeZone?: string) =>
+  new Intl.DateTimeFormat(intlLocale(), { ...options, timeZone }).format(new Date(iso))
+
+// Numeric parts only, so the locale doesn't change them.
 function dateParts(iso: string, options: Intl.DateTimeFormatOptions, timeZone?: string) {
-  const parts = new Intl.DateTimeFormat(LOCALE, { ...options, timeZone }).formatToParts(new Date(iso))
+  const parts = new Intl.DateTimeFormat('en-GB', { ...options, timeZone }).formatToParts(new Date(iso))
   return Object.fromEntries(parts.map((p) => [p.type, p.value])) as Record<string, string>
 }
 
@@ -38,8 +40,7 @@ export function formatUtcTime(iso: string): string {
 
 /** Local date for the headline, e.g. "Saturday, 6 February 2027". */
 export function formatHeadlineDate(iso: string, timeZone?: string): string {
-  const p = dateParts(iso, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }, timeZone)
-  return `${p.weekday}, ${p.day} ${p.month} ${p.year}`
+  return formatDate(iso, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }, timeZone)
 }
 
 /**
@@ -47,19 +48,17 @@ export function formatHeadlineDate(iso: string, timeZone?: string): string {
  * screens. The weekday goes on its own line (`formatWeekday`), so the date never breaks in the middle.
  */
 export function formatDateWithoutYear(iso: string, { short = false } = {}, timeZone?: string): string {
-  const p = dateParts(iso, { day: 'numeric', month: short ? 'short' : 'long' }, timeZone)
-  return `${p.day} ${p.month}`
+  return formatDate(iso, { day: 'numeric', month: short ? 'short' : 'long' }, timeZone)
 }
 
 /** Local date for the arrow targets, e.g. "6 Feb 2027". */
 export function formatShortDate(iso: string, timeZone?: string): string {
-  const p = dateParts(iso, { day: 'numeric', month: 'short', year: 'numeric' }, timeZone)
-  return `${p.day} ${p.month} ${p.year}`
+  return formatDate(iso, { day: 'numeric', month: 'short', year: 'numeric' }, timeZone)
 }
 
 /** Local weekday, e.g. "Saturday". */
 export function formatWeekday(iso: string, timeZone?: string): string {
-  return dateParts(iso, { weekday: 'long' }, timeZone).weekday
+  return formatDate(iso, { weekday: 'long' }, timeZone)
 }
 
 /** Local 24h time of one of the eclipse's moments, e.g. "12:59", with "(+1)" or "(−1)" when it falls on another local day than the peak. */
@@ -90,21 +89,21 @@ export function formatDuration(seconds: number | null): string | null {
   return `${m}m ${String(s).padStart(2, '0')}s`
 }
 
-const SPAN_UNITS: [name: string, ms: number][] = [
-  ['year', 365.25 * 86_400_000],
-  ['month', 30.44 * 86_400_000],
-  ['day', 86_400_000],
-  ['hour', 3_600_000],
-  ['minute', 60_000],
-]
+const SPAN_UNITS = [
+  ['span.year', 365.25 * 86_400_000],
+  ['span.month', 30.44 * 86_400_000],
+  ['span.day', 86_400_000],
+  ['span.hour', 3_600_000],
+  ['span.minute', 60_000],
+] as const
 
 /** A time span in its largest whole unit: "73 years", "1 month", "5 hours". Under a minute is "a moment". */
 export function formatSpan(ms: number): string {
-  for (const [name, size] of SPAN_UNITS) {
+  for (const [key, size] of SPAN_UNITS) {
     const n = Math.floor(Math.abs(ms) / size)
-    if (n >= 1) return `${n} ${name}${n === 1 ? '' : 's'}`
+    if (n >= 1) return t(key, { n })
   }
-  return 'a moment'
+  return t('span.moment')
 }
 
 const YEAR = 365.25 * 86_400_000
@@ -115,22 +114,22 @@ export function formatLongSpan(ms: number): string {
   const years = Math.floor(Math.abs(ms) / YEAR)
   if (years < 1) return formatSpan(ms)
   const months = Math.floor((Math.abs(ms) - years * YEAR) / MONTH)
-  const y = `${years} year${years === 1 ? '' : 's'}`
-  return months ? `${y}, ${months} month${months === 1 ? '' : 's'}` : y
+  const y = t('span.year', { n: years })
+  return months ? t('span.yearsAndMonths', { years: y, months: t('span.month', { n: months }) }) : y
 }
 
 /** Time left to the peak or end of a happening eclipse: "1 h 12 min", or "12 min" under an hour. */
 export function formatEndsIn({ days, hours, minutes }: Remaining): string {
   const h = days * 24 + hours
-  return h > 0 ? `${h} h ${minutes} min` : `${minutes} min`
+  return h > 0 ? t('span.hoursMinutes', { h, m: minutes }) : t('span.minutes', { m: minutes })
 }
 
 /** A distance as people plan by it: tens of km under 1,000, hundreds above. "180 km", "7,000 km". */
 export function formatKm(km: number): string {
   const step = km < 1000 ? 10 : 100
-  return `${(Math.round(km / step) * step).toLocaleString('en-GB')} km`
+  return new Intl.NumberFormat(intlLocale(), { style: 'unit', unit: 'kilometer' }).format(Math.round(km / step) * step)
 }
 
 export function formatMagnitude(value: number): string {
-  return value.toFixed(3)
+  return new Intl.NumberFormat(intlLocale(), { minimumFractionDigits: 3, maximumFractionDigits: 3 }).format(value)
 }
