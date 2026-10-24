@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { EclipseSummary } from '../data/types'
 import { buildMeta, escapeHtml, metaTags } from './meta'
 import { shareIntentUrl } from './targets'
-import { eclipsePath, parseEclipseId, shareUrl, typeOfId } from './url'
+import { eclipsePath, localeBase, localeFromPath, parseEclipseId, pathInLocale, shareUrl, typeOfId } from './url'
 
 const ECLIPSE: EclipseSummary = {
   id: '2026-08-12-solar',
@@ -41,6 +41,27 @@ describe('eclipse urls', () => {
     expect(parseEclipseId('/e/2026-08-12-solar/', '/eclipses/')).toBeNull()
     expect(parseEclipseId('/e/nonsense/')).toBeNull()
     expect(parseEclipseId('/e/2026-08-12-solar/extra/')).toBeNull()
+  })
+
+  it('puts every locale but English under its own prefix', () => {
+    expect(localeBase('en', '/eclipses/')).toBe('/eclipses/')
+    expect(localeBase('es', '/eclipses/')).toBe('/eclipses/es/')
+    expect(eclipsePath('2026-08-12-solar', localeBase('es', '/eclipses/'))).toBe('/eclipses/es/e/2026-08-12-solar/')
+  })
+
+  it('reads the locale from the path', () => {
+    expect(localeFromPath('/eclipses/es/e/2026-08-12-solar/', '/eclipses/')).toBe('es')
+    expect(localeFromPath('/eclipses/es', '/eclipses/')).toBe('es')
+    expect(localeFromPath('/eclipses/e/2026-08-12-solar/', '/eclipses/')).toBe('en')
+    expect(localeFromPath('/eclipses/xx/', '/eclipses/')).toBe('en')
+    expect(localeFromPath('/es/', '/eclipses/')).toBe('en')
+  })
+
+  it('moves a page to another locale, keeping the eclipse', () => {
+    expect(pathInLocale('/eclipses/e/2026-08-12-solar/', 'es', '/eclipses/')).toBe('/eclipses/es/e/2026-08-12-solar/')
+    expect(pathInLocale('/eclipses/es/e/2026-08-12-solar/', 'en', '/eclipses/')).toBe('/eclipses/e/2026-08-12-solar/')
+    expect(pathInLocale('/eclipses/es', 'en', '/eclipses/')).toBe('/eclipses/')
+    expect(pathInLocale('/', 'es')).toBe('/es/')
   })
 
   it('names the type an id carries', () => {
@@ -86,6 +107,15 @@ describe('metaTags', () => {
     }
     expect(tags).toContain('content="summary_large_image"')
     expect(tags).toContain('rel="canonical"')
+    expect(tags).toContain('<meta property="og:locale" content="en_GB" />')
+  })
+
+  it('links the page in every language when given its alternates', () => {
+    const tags = metaTags(buildMeta(ECLIPSE, 'https://x.test'), { en: 'https://x.test/e/a/', es: 'https://x.test/es/e/a/' })
+    expect(tags).toContain('<link rel="alternate" hreflang="en" href="https://x.test/e/a/" />')
+    expect(tags).toContain('<link rel="alternate" hreflang="es" href="https://x.test/es/e/a/" />')
+    expect(tags).toContain('<link rel="alternate" hreflang="x-default" href="https://x.test/e/a/" />')
+    expect(tags).toContain('<meta property="og:locale:alternate" content="es_LA" />')
   })
 })
 

@@ -131,3 +131,9 @@ Known limits:
 - Fixed during the check: the globe canvas was widening its container on phones (`minW=0` and `overflow=hidden` on the globe box, `minW=0` on the stack); "SECONDS" wrapped on small screens (smaller tile padding on phones).
 - Not checked: the "Check my location" permission prompt and the interaction (drag/zoom) of the globe. Headless screenshots cannot test these.
 - Note: Chrome enforces a minimum window width, so top-level screenshots at 390px are wider than 390px. Phone checks were done inside a 390px iframe.
+
+## Languages (in progress)
+- All UI text is in `src/i18n/locales/*.json`, read through one i18next instance with ICU messages. Formatters use the locale's own `Intl` patterns; English output is unchanged.
+- Spanish (es-419, informal "tú") is served under `/es/`, prerendered with `hreflang` and `og:locale`. A footer switcher moves between languages; nothing detects the browser language.
+- `src/i18n/i18n.test.ts` blocks incomplete or broken catalogs in CI.
+- Next: language-neutral OG cards, so one set serves every language. See `docs/specs/2026-10-24-languages.md`.

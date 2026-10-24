@@ -11,3 +11,4 @@ One file per feature, kept as a history of what was built and why.
 |---|---|---|
 | 2026-10-23 | [Browse eclipses through time](2026-10-23-browse-eclipses-through-time.md) | #4, #5, #6 |
 | 2026-10-23 | [UI review and design brief](2026-10-23-ui-review-design-brief.md) | #7 (brief), #8–#16 |
+| 2026-10-24 | [Languages: Spanish first, ready for more](2026-10-24-languages.md) | in progress |
