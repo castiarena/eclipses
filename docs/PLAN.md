@@ -134,6 +134,6 @@ Known limits:
 
 ## Languages (in progress)
 - All UI text is in `src/i18n/locales/*.json`, read through one i18next instance with ICU messages. Formatters use the locale's own `Intl` patterns; English output is unchanged.
-- Spanish (es-419, informal "tú") is served under `/es/`, prerendered with `hreflang` and `og:locale`. A footer switcher moves between languages; nothing detects the browser language.
+- Spanish (es-419, informal "tú") is served under `/es/`, prerendered with `hreflang` and `og:locale`. A language button in the header, beside location, moves between languages; nothing detects the browser language.
 - `src/i18n/i18n.test.ts` blocks incomplete or broken catalogs in CI.
 - Next: language-neutral OG cards, so one set serves every language. See `docs/specs/2026-10-24-languages.md`.

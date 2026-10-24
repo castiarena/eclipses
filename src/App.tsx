@@ -169,7 +169,11 @@ const App = () => {
                 >
                     <Flex justify="space-between" align="flex-start" {...passThrough}>
                         <Brand onClick={browser.reset} />
-                        <LocationButton location={location} />
+                        {/* Settings about the viewer, not the eclipse: language, then where they are. */}
+                        <HStack spacing={2}>
+                            <LanguageSwitcher />
+                            <LocationButton location={location} />
+                        </HStack>
                     </Flex>
 
                     <Flex flex={1} align="center" py={6} {...passThrough}>
@@ -200,10 +204,7 @@ const App = () => {
                     </Flex>
 
                     <Flex justify="space-between" align="flex-end" gap={6} {...passThrough}>
-                        <HStack spacing={4} align="flex-end">
-                            <LanguageSwitcher />
-                            <Footnote />
-                        </HStack>
+                        <Footnote />
                         <HStack spacing={3} flexShrink={0}>
                             {eclipse && <LegendPills eclipse={eclipse} />}
                             {/* Same glass as the legend, so it stays readable over the globe's overlays. */}
@@ -257,10 +258,12 @@ const App = () => {
             <Flex position="relative" zIndex={1} direction="column" minH="100dvh" px={5} pt={4}>
                 {/* Above the globe, which reaches up behind the countdown (see below). */}
                 <Stack spacing={5} position="relative" zIndex={2}>
-                    <HStack justify="space-between">
+                    <HStack justify="space-between" spacing={2}>
                         <Brand onClick={browser.reset} />
-                        <HStack spacing={2}>
+                        {/* Never shrinks: a long site name truncates instead. */}
+                        <HStack spacing={2} flexShrink={0}>
                             {eclipse && <ShareMenu eclipse={eclipse} size={36} />}
+                            <LanguageSwitcher compact />
                             <LocationButton location={location} compact />
                         </HStack>
                     </HStack>
@@ -302,9 +305,6 @@ const App = () => {
                     <NextSteps steps={steps.slice(1)} onShow={browser.show} compact />
                     <EclipseDetails eclipse={eclipse} compact />
                     <Footnote />
-                    <Box>
-                        <LanguageSwitcher />
-                    </Box>
                 </MobileSheet>
             )}
         </Box>
