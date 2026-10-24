@@ -1,113 +1,82 @@
 // Draws the 1200x630 link-preview card for every eclipse into dist/og/<id>.png, plus default.png for the
 // home page. Run after `vite build`; part of `pnpm build`.
+//
+// Cards are cached in node_modules/.cache/og under a hash of what they show and of the code, fonts and
+// libraries that draw them, so a build only draws the cards that changed. Misses are drawn by up to four
+// workers. OG_NO_CACHE=1 draws every card; OG_ONLY=<id> draws the home page's card and that one;
+// OG_WORKERS=<n> sets the worker count.
 
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
+import { constants } from 'node:fs'
+import { copyFile, mkdir, readdir, readFile, rm, stat } from 'node:fs/promises'
+import { availableParallelism } from 'node:os'
 import { join } from 'node:path'
-import { Resvg } from '@resvg/resvg-js'
-import satori from 'satori'
-import { formatDuration, formatHeadlineDate, formatMagnitude } from '../src/components/format.ts'
-import type { EclipseSummary } from '../src/data/types.ts'
-import { eclipseName, OG_IMAGE_SIZE, SITE_NAME } from '../src/share/meta.ts'
+import { Worker } from 'node:worker_threads'
+import { cardFields, fontPaths } from './og-card.mts'
+import type { Job, WorkerInput } from './og-worker.mts'
 import { DIST, ORIGIN, BASE, ROOT, readEclipses } from './site.mts'
 
-const fontFile = (pkg: string, file: string) => readFile(join(ROOT, 'node_modules', '@fontsource', pkg, 'files', file))
-const fonts = [
-  { name: 'Sora', data: await fontFile('sora', 'sora-latin-400-normal.woff'), weight: 400 as const },
-  { name: 'Sora', data: await fontFile('sora', 'sora-latin-700-normal.woff'), weight: 700 as const },
-  { name: 'JetBrains Mono', data: await fontFile('jetbrains-mono', 'jetbrains-mono-latin-400-normal.woff'), weight: 400 as const },
+const started = performance.now()
+const outDir = join(DIST, 'og')
+const cacheDir = join(ROOT, 'node_modules', '.cache', 'og')
+await Promise.all([mkdir(outDir, { recursive: true }), mkdir(cacheDir, { recursive: true })])
+
+// Everything that can change a card's pixels besides its own fields.
+const template = createHash('sha256')
+const sources = ['scripts/og-card.mts', 'src/share/meta.ts', 'src/components/format.ts'].map((f) => join(ROOT, f))
+for (const file of [...sources, ...fontPaths]) template.update(await readFile(file))
+for (const pkg of ['satori', '@resvg/resvg-js', 'sharp']) {
+  template.update(JSON.parse(await readFile(join(ROOT, 'node_modules', pkg, 'package.json'), 'utf8')).version)
+}
+const templateVersion = template.digest('hex')
+const keyOf = (fields: unknown) => createHash('sha256').update(templateVersion).update(JSON.stringify(fields)).digest('hex').slice(0, 32)
+
+const eclipses = await readEclipses()
+const only = process.env.OG_ONLY
+const jobs: Job[] = [
+  { id: 'default', key: keyOf('default') },
+  ...eclipses.filter((e) => !only || e.id === only).map((e) => ({ id: e.id, key: keyOf(cardFields(e)), eclipse: e })),
 ]
 
-// Satori takes React-like element trees; this builds them without JSX.
-type Node = { type: string; props: { style?: Record<string, unknown>; children?: unknown } }
-const el = (style: Record<string, unknown>, children?: unknown): Node => ({
-  type: 'div',
-  props: { style: { display: 'flex', ...style }, children },
-})
+const cached = new Set(process.env.OG_NO_CACHE ? [] : await readdir(cacheDir))
+const hits = jobs.filter((j) => cached.has(`${j.key}.png`))
+const misses = jobs.filter((j) => !cached.has(`${j.key}.png`))
 
-// Same hues as src/globe/palette.ts.
-const TONE = {
-  solar: { dot: '#f5c84c', glow: 'rgba(245, 200, 76, 0.55)' },
-  lunar: { dot: '#b8a6ff', glow: 'rgba(124, 92, 255, 0.55)' },
-}
+// A copy-on-write clone where the file system has them, a plain copy elsewhere.
+await Promise.all(hits.map((j) => copyFile(join(cacheDir, `${j.key}.png`), join(outDir, `${j.id}.png`), constants.COPYFILE_FICLONE)))
 
-/** A disc with a glowing rim: the Sun with the Moon across it (solar), or the Moon in shadow (lunar). */
-function disc(type: 'solar' | 'lunar'): Node {
-  const { dot, glow } = TONE[type]
-  const size = 320
-  const body =
-    type === 'solar'
-      ? el({ width: size, height: size, borderRadius: size, background: '#05060b', border: `4px solid ${dot}` })
-      : el({
-          width: size,
-          height: size,
-          borderRadius: size,
-          background: 'radial-gradient(circle at 70% 35%, #8f7bff 0%, #4a3a9c 55%, #1d1650 100%)',
-        })
-  // The glow is a gradient behind the disc: a blurred box-shadow made each card take over a second to draw.
-  return el(
-    { width: 420, height: 420, flexShrink: 0, alignItems: 'center', justifyContent: 'center', borderRadius: 420, background: `radial-gradient(circle, ${glow} 0%, ${glow} 38%, rgba(5, 6, 11, 0) 70%)` },
-    body,
-  )
-}
+// tsx's loader does not reach worker threads (Node only strips their types, without tsx's import resolution),
+// so each worker registers it before loading the card code.
+const boot = [
+  `import { register } from ${JSON.stringify(import.meta.resolve('tsx/esm/api'))}`,
+  'register()',
+  `await import(${JSON.stringify(new URL('./og-worker.mts', import.meta.url).href)})`,
+].join('\n')
+const workerUrl = new URL(`data:text/javascript,${encodeURIComponent(boot)}`)
 
-function card(opts: { eyebrow: string; weekday: string; date: string; facts: string; type: 'solar' | 'lunar' }): Node {
-  const { dot } = TONE[opts.type]
-  return el(
-    {
-      width: OG_IMAGE_SIZE.width,
-      height: OG_IMAGE_SIZE.height,
-      boxSizing: 'border-box',
-      padding: '64px 72px',
-      background: 'linear-gradient(135deg, #05060b 0%, #0b0d16 100%)',
-      color: 'white',
-      fontFamily: 'Sora',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-    },
-    [
-      el({ flexDirection: 'column', justifyContent: 'space-between', alignSelf: 'stretch', width: 650, flexShrink: 0 }, [
-        el({ alignItems: 'center', fontFamily: 'JetBrains Mono', fontSize: 24, letterSpacing: 3, color: 'rgba(255,255,255,0.8)' }, [
-          el({ width: 14, height: 14, borderRadius: 14, background: dot, marginRight: 16 }),
-          opts.eyebrow.toUpperCase(),
-        ]),
-        el({ flexDirection: 'column' }, [
-          el({ fontSize: 34, color: 'rgba(255,255,255,0.7)', marginBottom: 8 }, opts.weekday),
-          el({ fontSize: 76, fontWeight: 700, lineHeight: 1.05 }, opts.date),
-          el({ fontFamily: 'JetBrains Mono', fontSize: 26, color: 'rgba(255,255,255,0.7)', marginTop: 28 }, opts.facts),
-        ]),
-        el({ fontSize: 28, fontWeight: 700, color: dot }, SITE_NAME),
-      ]),
-      disc(opts.type),
-    ],
-  )
-}
-
-async function render(node: Node): Promise<Buffer> {
-  const svg = await satori(node as never, { ...OG_IMAGE_SIZE, fonts })
-  return new Resvg(svg, { fitTo: { mode: 'width', value: OG_IMAGE_SIZE.width } }).render().asPng()
-}
-
-function eclipseCard(e: EclipseSummary): Node {
-  // "Wednesday, 12 August 2026" -> weekday over "12 August 2026".
-  const [weekday, date] = formatHeadlineDate(e.peakUtc, 'UTC').split(', ')
-  const duration = formatDuration(e.durationSec)
-  return card({
-    eyebrow: `${eclipseName(e)} · Saros ${e.saros}`,
-    weekday,
-    date,
-    facts: [`Magnitude ${formatMagnitude(e.magnitude)}`, duration && `Up to ${duration}`].filter(Boolean).join(' · '),
-    type: e.type,
-  })
-}
-
-const dir = join(DIST, 'og')
-await mkdir(dir, { recursive: true })
-const eclipses = await readEclipses()
-
-await writeFile(
-  join(dir, 'default.png'),
-  await render(card({ eyebrow: 'Solar and lunar eclipses', weekday: 'Countdown and 3D globe', date: 'Next eclipse', facts: 'Where each one can be seen', type: 'solar' })),
+const workers = Math.min(Number(process.env.OG_WORKERS) || Math.min(availableParallelism(), 4), misses.length)
+await Promise.all(
+  Array.from({ length: workers }, (_, w) => {
+    // Every n-th card, so each worker gets a similar mix.
+    const input: WorkerInput = { jobs: misses.filter((_, i) => i % workers === w), outDir, cacheDir }
+    const worker = new Worker(workerUrl, { workerData: input })
+    return new Promise<void>((resolve, reject) => {
+      worker.once('error', reject)
+      worker.once('exit', (code) => (code ? reject(new Error(`og worker exited with ${code}`)) : resolve()))
+    })
+  }),
 )
-for (const e of (process.env.OG_ONLY ? eclipses.filter((x) => x.id === process.env.OG_ONLY) : eclipses)) await writeFile(join(dir, `${e.id}.png`), await render(eclipseCard(e)))
 
-console.log(`og images: ${eclipses.length + 1} cards in dist/og (origin ${ORIGIN}, base ${BASE})`)
+// Keep only this build's cards, so the cache never grows. A partial OG_ONLY build keeps everything.
+if (!only) {
+  const used = new Set(jobs.map((j) => `${j.key}.png`))
+  await Promise.all((await readdir(cacheDir)).filter((f) => !used.has(f)).map((f) => rm(join(cacheDir, f))))
+}
+
+let bytes = 0
+for (const j of jobs) bytes += (await stat(join(outDir, `${j.id}.png`))).size
+const seconds = ((performance.now() - started) / 1000).toFixed(1)
+console.log(
+  `og images: ${jobs.length} cards (${misses.length} drawn on ${workers} threads, ${hits.length} cached), ` +
+    `${(bytes / 1024 / 1024).toFixed(1)} MB, avg ${Math.round(bytes / jobs.length / 1024)} KB, ${seconds}s (origin ${ORIGIN}, base ${BASE})`,
+)
