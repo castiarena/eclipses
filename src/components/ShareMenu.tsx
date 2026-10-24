@@ -88,7 +88,7 @@ const glass = {
 } as const
 
 /** Share button with the five ways out: copy the link, WhatsApp, Instagram, Facebook and X. */
-export const ShareMenu: FC<{ eclipse: EclipseSummary; size?: number }> = ({ eclipse, size = 40 }) => {
+export const ShareMenu: FC<{ eclipse: EclipseSummary }> = ({ eclipse }) => {
   const { t } = useTranslation()
   const toast = useToast()
   const meta = buildMeta(eclipse, window.location.origin, appBase())
@@ -125,9 +125,10 @@ export const ShareMenu: FC<{ eclipse: EclipseSummary; size?: number }> = ({ ecli
         aria-label={t('share.label')}
         icon={<ShareIcon />}
         isRound
-        w={`${size}px`}
-        minW={`${size}px`}
-        h={`${size}px`}
+        // 44 px, like the language and location buttons beside it: the smallest comfortable touch target.
+        w="44px"
+        minW="44px"
+        h="44px"
       />
       <Portal>
         <MenuList bg="rgba(10, 11, 20, 0.92)" borderColor="whiteAlpha.300" backdropFilter="blur(10px)" minW="180px" zIndex="popover">

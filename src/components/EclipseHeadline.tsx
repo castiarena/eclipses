@@ -5,6 +5,7 @@ import { GLOBE_COLORS } from '../globe/palette'
 import { localYear } from '../hooks/timeline'
 import type { EclipseBrowser } from '../hooks/useEclipseBrowser'
 import { t } from '../i18n'
+import { SHORTER_WIDE } from '../theme'
 import { eclipseName, eclipseShortName, formatDateWithoutYear, formatHeadlineDate, formatShortDate, formatWeekday } from './format'
 import { StatusChip } from './StatusChip'
 import { TimelineStrip } from './TimelineStrip'
@@ -193,7 +194,7 @@ export const EclipseHeadline: FC<EclipseHeadlineProps> = ({
   )
 
   return (
-    <Stack spacing={{ base: 2, lg: 3 }}>
+    <Stack spacing={{ base: 2, lg: 3 }} sx={{ [SHORTER_WIDE]: { gap: 2 } }}>
       {/* Announces each step. The visible date holds the year picker, whose 100 options must not be read out. */}
       <VisuallyHidden aria-live="polite">
         {t('headline.announce', { name: eclipseName(eclipse), date: formatHeadlineDate(eclipse.peakUtc) })}
@@ -228,7 +229,7 @@ export const EclipseHeadline: FC<EclipseHeadlineProps> = ({
         </HStack>
       ) : (
         <>
-          <Text as="h2" fontSize="5xl" fontWeight="semibold" lineHeight="1.05" letterSpacing="-0.025em" whiteSpace="nowrap">
+          <Text as="h2" fontSize="5xl" fontWeight="semibold" lineHeight="1.05" letterSpacing="-0.025em" whiteSpace="nowrap" sx={{ [SHORTER_WIDE]: { fontSize: '4xl' } }}>
             <Text as="span" display="block" fontSize="lg" fontWeight="medium" letterSpacing="normal" color="whiteAlpha.700" mb={1}>
               {weekday}
             </Text>
@@ -249,6 +250,8 @@ export const EclipseHeadline: FC<EclipseHeadlineProps> = ({
         <Text
           minH={compact ? '3.2em' : undefined}
           fontSize={compact ? 'sm' : 'lg'}
+          // Smaller on short screens; the padding keeps clear of the strip's year labels above it.
+          sx={compact ? undefined : { [SHORTER_WIDE]: { fontSize: 'md', pt: 3 } }}
           lineHeight={compact ? '1.45' : '1.55'}
           color="whiteAlpha.800"
           maxW="460px"
