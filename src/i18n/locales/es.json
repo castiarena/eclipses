@@ -2,8 +2,8 @@
   "site.name": "Próximo eclipse",
   "site.description": "Cuenta regresiva para el próximo eclipse solar y lunar, y un globo 3D de dónde se puede ver cada uno.",
   "site.backToNext": "Volver al próximo eclipse",
-  "site.footnote": "Las horas se basan en UTC; las posteriores a 2030 son predicciones y pueden variar alrededor de un minuto. Datos: catálogos de eclipses de NASA GSFC (Espenak y Meeus).",
-  "site.globeHint": "Arrastra para girar · Desplázate para hacer zoom",
+  "site.footnote": "Horas en UTC; las posteriores a 2030 son predicciones y pueden variar un minuto. Datos: catálogos de eclipses de NASA GSFC (Espenak y Meeus).",
+  "site.globeHint": "Arrastra para girar · Desplaza para zoom",
   "site.language": "Idioma",
 
   "filter.label": "Tipo de eclipse",

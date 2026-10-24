@@ -41,3 +41,12 @@ const overrideTheme: ThemeOverride = {
 }
 
 export const theme = extendTheme(overrideTheme)
+
+/**
+ * The wide layout on a short screen (a 1280x720 or 1440x900 laptop): spacing tightens so the page fits
+ * without scrolling. `lg` is 62em; phones keep their own spacing.
+ */
+export const SHORT_WIDE = '@media (min-width: 62em) and (max-height: 900px)'
+
+/** Shorter still (a 1280x720 laptop): smaller tiles and date on top of `SHORT_WIDE`. */
+export const SHORTER_WIDE = '@media (min-width: 62em) and (max-height: 760px)'

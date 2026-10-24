@@ -6,6 +6,7 @@ import type { Phase } from '../hooks/timeline'
 import type { EclipseFilter, EclipseSummary } from '../data/types'
 import { useTranslation } from 'react-i18next'
 import { t } from '../i18n'
+import { SHORT_WIDE, SHORTER_WIDE } from '../theme'
 import { formatEndsIn, formatEventTime, formatLongSpan, formatSpan, utcOffsetLabel } from './format'
 
 const UNITS: (keyof Remaining)[] = ['days', 'hours', 'minutes', 'seconds']
@@ -27,6 +28,8 @@ const SHORT_UNIT_KEY = {
 const pad = (n: number) => String(n).padStart(2, '0')
 
 const TILE_HEIGHT = { base: '76px', lg: '104px' }
+// Shorter tiles on short laptop screens, so the page fits without scrolling.
+const TILE_SHORT = { [SHORT_WIDE]: { h: '88px' }, [SHORTER_WIDE]: { h: '80px' } }
 
 const tileStyle = {
   bg: 'rgba(14, 15, 26, 0.82)',
@@ -36,7 +39,7 @@ const tileStyle = {
 } as const
 
 export const DigitTile: FC<{ label: string; value: number }> = ({ label, value }) => (
-  <Box {...tileStyle} h={TILE_HEIGHT} display="flex" flexDir="column" alignItems="center" justifyContent="center">
+  <Box {...tileStyle} h={TILE_HEIGHT} sx={TILE_SHORT} display="flex" flexDir="column" alignItems="center" justifyContent="center">
     <Text
       fontSize={{ base: '3xl', lg: '5xl' }}
       fontWeight="semibold"
@@ -87,6 +90,7 @@ const Statement: FC<{ title: string; quiet?: boolean; children?: ReactNode }> = 
     bg={quiet ? { base: 'rgba(14, 15, 26, 0.82)', lg: 'transparent' } : tileStyle.bg}
     border={quiet ? { base: '1px solid', lg: 'none' } : tileStyle.border}
     h={quiet ? { base: TILE_HEIGHT.base, lg: 'auto' } : TILE_HEIGHT}
+    sx={quiet ? undefined : TILE_SHORT}
     px={quiet ? { base: 5, lg: 0 } : { base: 5, lg: 7 }}
     display="flex"
     flexDir="column"
@@ -135,7 +139,7 @@ export const Countdown: FC<CountdownProps> = ({ eclipse, phase, target, remainin
         <Box h="18px" />
         <SimpleGrid columns={4} spacing={{ base: 2, sm: 3 }} aria-label={t('countdown.loading')}>
           {UNITS.map((unit) => (
-            <Skeleton key={unit} h={TILE_HEIGHT} borderRadius="xl" startColor="whiteAlpha.50" endColor="whiteAlpha.200" />
+            <Skeleton key={unit} h={TILE_HEIGHT} sx={TILE_SHORT} borderRadius="xl" startColor="whiteAlpha.50" endColor="whiteAlpha.200" />
           ))}
         </SimpleGrid>
       </Stack>

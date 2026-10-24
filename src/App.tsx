@@ -1,6 +1,7 @@
 import { Box, Divider, Flex, HStack, Stack, Text, useBreakpointValue } from "@chakra-ui/react"
 import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type FC } from "react"
 import { useTranslation } from "react-i18next"
+import { SHORT_WIDE, SHORTER_WIDE } from "./theme"
 import { Brand } from "./components/Brand"
 import { Countdown, EventLine, EventTimes } from "./components/Countdown"
 import { EclipseDetails } from "./components/EclipseDetails"
@@ -61,7 +62,8 @@ const writeViewToUrl = (filter: EclipseFilter, eclipseId: string | null) => {
 const Footnote: FC = () => {
     const { t } = useTranslation()
     return (
-        <Text fontSize="sm" lineHeight="1.5" color="whiteAlpha.700" maxW="460px">
+        // Wider on desktop, where it shares the footer only with the legend: two lines instead of three.
+        <Text fontSize="sm" lineHeight="1.5" color="whiteAlpha.700" maxW={{ base: "460px", lg: "620px" }}>
             {t("site.footnote")}
         </Text>
     )
@@ -166,6 +168,7 @@ const App = () => {
                     px={{ lg: 16, xl: 20 }}
                     py={10}
                     {...passThrough}
+                    sx={{ ...passThrough.sx, [SHORT_WIDE]: { py: 6 }, [SHORTER_WIDE]: { py: 3 } }}
                 >
                     <Flex justify="space-between" align="flex-start" {...passThrough}>
                         <Brand onClick={browser.reset} />
@@ -176,8 +179,8 @@ const App = () => {
                         </HStack>
                     </Flex>
 
-                    <Flex flex={1} align="center" py={6} {...passThrough}>
-                        <Stack spacing={{ lg: 6, "2xl": 7 }} w="560px" position="relative">
+                    <Flex flex={1} align="center" py={6} {...passThrough} sx={{ ...passThrough.sx, [SHORT_WIDE]: { py: 3 }, [SHORTER_WIDE]: { py: 1 } }}>
+                        <Stack spacing={{ lg: 6, "2xl": 7 }} w="560px" position="relative" sx={{ [SHORT_WIDE]: { gap: 4 }, [SHORTER_WIDE]: { gap: 3 } }}>
                             {/* The answer to "can I see it from here?", beside the question, over the globe's edge. */}
                             <Box position="absolute" left="calc(100% + 48px)" top="96px">
                                 <LocationCard location={location} eclipse={eclipse} tense={tense} />
@@ -203,8 +206,11 @@ const App = () => {
                         </Stack>
                     </Flex>
 
-                    <Flex justify="space-between" align="flex-end" gap={6} {...passThrough}>
-                        <Footnote />
+                    {/* Wraps on narrow screens, so the footnote takes its own line instead of a tall, narrow column. */}
+                    <Flex justify="space-between" align="flex-end" columnGap={6} rowGap={3} flexWrap="wrap" {...passThrough}>
+                        <Box flex="1 1 360px">
+                            <Footnote />
+                        </Box>
                         <HStack spacing={3} flexShrink={0}>
                             {eclipse && <LegendPills eclipse={eclipse} />}
                             {/* Same glass as the legend, so it stays readable over the globe's overlays. */}
@@ -262,7 +268,7 @@ const App = () => {
                         <Brand onClick={browser.reset} />
                         {/* Never shrinks: a long site name truncates instead. */}
                         <HStack spacing={2} flexShrink={0}>
-                            {eclipse && <ShareMenu eclipse={eclipse} size={36} />}
+                            {eclipse && <ShareMenu eclipse={eclipse} />}
                             <LanguageSwitcher compact />
                             <LocationButton location={location} compact />
                         </HStack>

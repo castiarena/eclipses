@@ -23,8 +23,9 @@ const EclipseMark: FC<{ size: number }> = ({ size }) => (
 export const Brand: FC<{ onClick?: () => void }> = ({ onClick }) => {
   const { t } = useTranslation()
   return (
-    // minW 0 lets a long name (other languages) truncate beside the header buttons instead of pushing them out.
-    <Text as="h1" fontSize="lg" fontWeight="semibold" letterSpacing="-0.01em" minW={0}>
+    // 16 px on phones, where it shares the top bar with three 44 px buttons. minW 0 lets a longer name (other
+    // languages) truncate beside them instead of pushing them out.
+    <Text as="h1" fontSize={{ base: 'md', lg: 'lg' }} fontWeight="semibold" letterSpacing="-0.01em" minW={0}>
       <HStack
         as="button"
         type="button"
