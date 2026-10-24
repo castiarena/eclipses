@@ -4,6 +4,7 @@
   "site.backToNext": "Back to the next eclipse",
   "site.footnote": "Times are UTC-based; those after 2030 are predictions and may shift by a minute or so. Data: NASA GSFC eclipse catalogs (Espenak & Meeus).",
   "site.globeHint": "Drag to rotate · Scroll to zoom",
+  "site.language": "Language",
 
   "filter.label": "Eclipse type",
   "filter.solar": "Solar",
