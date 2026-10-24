@@ -3,11 +3,6 @@ import type { EclipseSummary } from '../data/types'
 import { t } from '../i18n'
 import { eclipsePath } from './url'
 
-export { eclipseName }
-
-// Read at import, so in English: the OG cards are drawn once for every language.
-export const SITE_NAME = t('site.name')
-
 export interface EclipseMeta {
   title: string
   description: string

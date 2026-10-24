@@ -4,8 +4,8 @@ import { OG_IMAGE_SIZE } from '../src/share/meta'
 import { defaultCard, eclipseCard, encode, renderRaw } from './og-card.mts'
 import { readEclipses } from './site.mts'
 
-// Total, annular, partial and hybrid solar; total and penumbral lunar; plus the home page's card.
-const IDS = ['2027-08-02-solar', '2001-12-14-solar', '2004-04-19-solar', '2005-04-08-solar', '2001-01-09-lunar', '2001-12-30-lunar']
+// Total, annular, partial and hybrid solar; total, penumbral and partial lunar; plus the home page's card.
+const IDS = ['2027-08-02-solar', '2001-12-14-solar', '2004-04-19-solar', '2005-04-08-solar', '2001-01-09-lunar', '2001-12-30-lunar', '2001-07-05-lunar']
 
 /** PSNR over RGB, the largest channel error, and how many pixels are off by more than 12. */
 function compare(a: Buffer, b: Buffer) {
@@ -39,11 +39,12 @@ describe('link-preview cards', () => {
       expect([info.width, info.height]).toEqual([OG_IMAGE_SIZE.width, OG_IMAGE_SIZE.height])
       expect(png[25]).toBe(3) // IHDR colour type 3: indexed palette
 
-      // Measured at quality 99: PSNR 53.7 dB or more, max error 22, at most 0.02% of pixels off by more than 12,
-      // all on anti-aliased text edges. The bounds leave headroom for library updates, not for visible change.
+      // Measured at quality 99 on the language-neutral cards: max error 28 (anti-aliased edges of the small violet
+      // mark and dot on lunar cards), at most 0.03% of pixels off by more than 12. The bounds leave headroom for
+      // library updates, not for visible change.
       const { psnr, max, offShare } = compare(truecolor, data)
       expect(psnr).toBeGreaterThan(50)
-      expect(max).toBeLessThanOrEqual(28)
+      expect(max).toBeLessThanOrEqual(32)
       expect(offShare).toBeLessThan(0.0005)
     }
     // Truecolor cards were ~140 KB; this fails loudly if the palette encode is lost.
