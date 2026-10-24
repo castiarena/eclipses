@@ -19,16 +19,17 @@ import { useEclipseBrowser } from "./hooks/useEclipseBrowser"
 import { useEclipseGeometry } from "./hooks/useEclipseGeometry"
 import { useArrowKeys, useSwipe } from "./hooks/useStepInput"
 import type { EclipseFilter } from "./data/types"
-import { appBase, eclipsePath, parseEclipseId, typeOfId } from "./share/url"
+import { eclipsePath, pageBase, parseEclipseId, typeOfId } from "./share/url"
+import { LanguageSwitcher } from "./components/LanguageSwitcher"
 
 // three.js is large, so the globe is split out and loaded on first render.
 const EclipseGlobe = lazy(() => import("./components/EclipseGlobe"))
 
-// The URL carries the view so it can be shared: ?type=lunar for the filter, and /e/<id>/ for a browsed eclipse.
-// With no eclipse in the path, a reload returns to the next one.
+// The URL carries the view so it can be shared: ?type=lunar for the filter, and /e/<id>/ for a browsed eclipse,
+// under the locale's prefix (/es/e/<id>/). With no eclipse in the path, a reload returns to the next one.
 const readEclipseIdFromUrl = (): string | null => {
     try {
-        return parseEclipseId(window.location.pathname, appBase())
+        return parseEclipseId(window.location.pathname, pageBase())
     } catch {
         return null
     }
@@ -49,7 +50,7 @@ const readFilterFromUrl = (): EclipseFilter => {
 const writeViewToUrl = (filter: EclipseFilter, eclipseId: string | null) => {
     try {
         const url = new URL(window.location.href)
-        url.pathname = eclipseId ? eclipsePath(eclipseId, appBase()) : appBase()
+        url.pathname = eclipseId ? eclipsePath(eclipseId, pageBase()) : pageBase()
         url.searchParams.set("type", filter)
         window.history.replaceState(null, "", url)
     } catch {
@@ -199,7 +200,10 @@ const App = () => {
                     </Flex>
 
                     <Flex justify="space-between" align="flex-end" gap={6} {...passThrough}>
-                        <Footnote />
+                        <HStack spacing={4} align="flex-end">
+                            <LanguageSwitcher />
+                            <Footnote />
+                        </HStack>
                         <HStack spacing={3} flexShrink={0}>
                             {eclipse && <LegendPills eclipse={eclipse} />}
                             {/* Same glass as the legend, so it stays readable over the globe's overlays. */}
@@ -298,6 +302,9 @@ const App = () => {
                     <NextSteps steps={steps.slice(1)} onShow={browser.show} compact />
                     <EclipseDetails eclipse={eclipse} compact />
                     <Footnote />
+                    <Box>
+                        <LanguageSwitcher />
+                    </Box>
                 </MobileSheet>
             )}
         </Box>

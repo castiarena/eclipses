@@ -8,21 +8,30 @@ import { initReactI18next } from 'react-i18next'
 import en from './locales/en.json'
 import { DEFAULT_LOCALE, LOCALES, type Locale } from './locales'
 
-export const i18n = i18next.createInstance()
+function createI18n() {
+  const instance = i18next.createInstance()
+  instance
+    .use(ICU)
+    .use(initReactI18next)
+    .init({
+      lng: DEFAULT_LOCALE,
+      fallbackLng: DEFAULT_LOCALE,
+      resources: { [DEFAULT_LOCALE]: { translation: en } },
+      initAsync: false,
+      // Keys are flat ("status.upcoming"), not nested objects.
+      keySeparator: false,
+      nsSeparator: false,
+      returnNull: false,
+    })
+  return instance
+}
 
-i18n
-  .use(ICU)
-  .use(initReactI18next)
-  .init({
-    lng: DEFAULT_LOCALE,
-    fallbackLng: DEFAULT_LOCALE,
-    resources: { [DEFAULT_LOCALE]: { translation: en } },
-    initAsync: false,
-    // Keys are flat ("status.upcoming"), not nested objects.
-    keySeparator: false,
-    nsSeparator: false,
-    returnNull: false,
-  })
+// The build scripts run under tsx, which can load this module twice (as ESM for the script, as CommonJS for the
+// src modules it imports). Both copies must share one instance, or `switchLocale` wouldn't reach the formatters.
+const SHARED = Symbol.for('eclipses.i18n')
+const shared = globalThis as typeof globalThis & { [SHARED]?: ReturnType<typeof createI18n> }
+
+export const i18n = (shared[SHARED] ??= createI18n())
 
 export const t = i18n.t.bind(i18n)
 
