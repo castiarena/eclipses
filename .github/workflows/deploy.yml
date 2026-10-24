@@ -29,6 +29,12 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
+      # Link-preview cards, keyed per card by scripts/build-og-images.mts; a partial restore is safe.
+      - uses: actions/cache@v4
+        with:
+          path: node_modules/.cache/og
+          key: og-${{ hashFiles('scripts/og-*.mts', 'scripts/build-og-images.mts', 'src/share/meta.ts', 'src/components/format.ts', 'src/data/eclipses.json', 'pnpm-lock.yaml') }}
+          restore-keys: og-
       - run: pnpm build
         env:
           BASE_PATH: /${{ github.event.repository.name }}/
