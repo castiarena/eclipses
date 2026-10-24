@@ -51,10 +51,12 @@ export interface EclipseBrowser {
 export function useEclipseBrowser(
   filter: EclipseFilter,
   repo: EclipseRepository = defaultRepository,
+  /** An eclipse to start pinned on, e.g. from a shared link. An id not in the data falls back to live. */
+  initialId: string | null = null,
 ): EclipseBrowser {
   const [all, setAll] = useState<EclipseSummary[] | null>(null)
   const [now, setNow] = useState(() => Date.now())
-  const [pin, setPin] = useState<{ filter: EclipseFilter; id: string | null }>({ filter, id: null })
+  const [pin, setPin] = useState<{ filter: EclipseFilter; id: string | null }>({ filter, id: initialId })
 
   useEffect(() => {
     let active = true
@@ -107,7 +109,8 @@ export function useEclipseBrowser(
     target,
     remaining,
     now,
-    isLive: pinnedId === null,
+    // A pinned id that isn't in the data shows the live view, so it counts as live once the data is in.
+    isLive: pinnedId === null || (all !== null && eclipse?.id !== pinnedId),
     loading: all === null,
     previous,
     following,
